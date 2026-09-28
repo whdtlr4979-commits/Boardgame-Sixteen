@@ -1,6 +1,7 @@
-/* global io, Sixteen */
-(() => {
-  'use strict';
+import * as Sixteen from './game.js';
+import { createNet } from './net.js';
+
+{
 
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -70,51 +71,90 @@
     if (e.key === 'Escape' && !$('#modal').hidden && $('[data-close]', $('#modalBox'))) closeModal();
   });
 
+  const STALL_MS = 60_000;
   const closeBtn = '<button class="icon-btn" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
 
-  /* ---------------- 소켓 ---------------- */
-  const socket = io();
-  const emit = (ev, payload = {}) => new Promise((resolve) => {
-    socket.emit(ev, payload, (res) => {
-      if (!res || !res.ok) toast((res && res.error) || '요청에 실패했습니다.', true);
-      resolve(res || { ok: false });
-    });
-  });
+  /* ---------------- Supabase 연결 ---------------- */
+  const config = window.SIXTEEN_CONFIG || {};
+  const configured = !!(config.supabaseUrl && config.supabaseAnonKey && !/YOUR_/.test(config.supabaseUrl + config.supabaseAnonKey));
+  let net = null;
 
-  socket.on('connect', () => {
-    const name = store.get('sixteen.name');
-    if (name) hello(name, store.get('sixteen.avatar'));
-    else showLogin();
-  });
-  socket.on('disconnect', () => toast('서버와 연결이 끊겼습니다. 재연결 중...', true));
-  socket.on('lobby', (data) => { state.lobby = data; renderLobby(); });
-  socket.on('room', (room) => onRoom(room));
-  socket.on('kicked', (msg) => {
+  async function emit(action, payload = {}) {
+    if (!net) {
+      showSetup();
+      return { ok: false };
+    }
+    let res;
+    try {
+      res = await net.call(action, payload);
+    } catch (e) {
+      res = { ok: false, error: e.message };
+    }
+    if (!res.ok) toast(res.error || '요청에 실패했습니다.', true);
+    return res;
+  }
+
+  function onKicked(msg) {
     toast(msg, true);
     state.room = null;
-    go('home');
-  });
+    state.shownRoundResult = null;
+    $('#navGame').hidden = true;
+    $('#tabGame').hidden = true;
+    if (state.view === 'game') go('home');
+  }
+
+  async function boot() {
+    if (!configured) return showSetup();
+    net = createNet(config, {
+      onLobby: (data) => { state.lobby = data; renderLobby(); },
+      onRoom: (room) => onRoom(room),
+      onKicked,
+    });
+    const name = store.get('sixteen.name');
+    if (name) await hello(name, store.get('sixteen.avatar'));
+    else showLogin();
+  }
 
   async function hello(name, avatar) {
-    const res = await emit('hello', { token: store.get('sixteen.token'), name, avatar });
-    if (!res.ok) { showLogin(); return false; }
-    state.me = { name: res.name, avatar: res.avatar, token: res.token };
-    state.avatars = res.avatars || state.avatars;
-    store.set('sixteen.token', res.token);
-    store.set('sixteen.name', res.name);
-    store.set('sixteen.avatar', res.avatar);
+    name = String(name || '').trim().slice(0, 12);
+    if (!name) { toast('닉네임을 입력하세요.', true); return false; }
+    if (!state.avatars.includes(avatar)) avatar = state.avatars[Math.floor(Math.random() * state.avatars.length)];
+    state.me = { name, avatar };
+    store.set('sixteen.name', name);
+    store.set('sixteen.avatar', avatar);
     renderMe();
+    try {
+      if (!net.userId) await net.start(state.me);
+      else await net.setProfile(state.me);
+    } catch (e) {
+      toast(e.message, true);
+      return false;
+    }
     renderLobby();
-    if (!res.roomCode) {
+    const res = await emit('resume', { profile: state.me });
+    if (res.ok && res.reclaimed) toast('진행 중이던 게임으로 돌아왔습니다 🎮');
+    if (res.ok && !res.code) {
       state.room = null;
       const invite = new URLSearchParams(location.search).get('room');
       if (invite) {
         history.replaceState(null, '', location.pathname);
-        const j = await emit('room:join', { code: invite });
+        const j = await emit('join', { code: invite, profile: state.me });
         if (j.ok) go('game');
       } else if (state.view === 'game') go('home');
     }
     return true;
+  }
+
+  function showSetup() {
+    openModal(`
+      <div class="modal-body login">
+        <span class="brand-text">Sixteen</span>
+        <p>Supabase 연결 설정이 필요합니다</p>
+        <div class="rules" style="text-align:left">
+          <p><code>public/config.js</code> 파일에 Supabase 프로젝트의 <b>Project URL</b>과 <b>anon(public) key</b>를 입력하세요.</p>
+          <p class="note">Supabase 대시보드 → Project Settings → API 에서 확인할 수 있습니다. 자세한 설정 방법은 README를 참고하세요.</p>
+        </div>
+      </div>`, { dismissable: false });
   }
 
   /* ---------------- 로그인 / 프로필 ---------------- */
@@ -200,7 +240,8 @@
       </div>`);
     $('#createForm', box).onsubmit = async (e) => {
       e.preventDefault();
-      const res = await emit('room:create', {
+      const res = await emit('create', {
+        profile: state.me,
         name: $('#crName', box).value,
         maxPlayers: $('#crMax', box).value,
         rounds: $('#crRounds', box).value,
@@ -220,23 +261,23 @@
       </div>`);
     $('#joinForm', box).onsubmit = async (e) => {
       e.preventDefault();
-      const res = await emit('room:join', { code: $('#joinCode', box).value });
+      const res = await emit('join', { code: $('#joinCode', box).value, profile: state.me });
       if (res.ok) { closeModal(); go('game'); }
     };
   }
 
   async function joinRoom(code) {
-    const res = await emit('room:join', { code });
+    const res = await emit('join', { code, profile: state.me });
     if (res.ok) go('game');
   }
 
   async function quickPlay() {
-    const res = await emit('room:create', { name: `${state.me?.name || ''}의 연습 게임`, maxPlayers: 4, rounds: 3 });
+    const res = await emit('create', { profile: state.me, name: `${state.me?.name || ''}의 연습 게임`, maxPlayers: 4, rounds: 3 });
     if (!res.ok) return;
-    await emit('room:addBot');
-    await emit('room:addBot');
-    await emit('room:addBot');
-    await emit('game:start');
+    await emit('addBot');
+    await emit('addBot');
+    await emit('addBot');
+    await emit('start');
     go('game');
   }
 
@@ -457,7 +498,7 @@
       slots.push('<li class="member empty"><span class="avatar">+</span><span class="tag">빈 자리</span></li>');
     }
     $('#memberGrid').innerHTML = slots.join('');
-    $$('[data-kick]').forEach((b) => (b.onclick = () => emit('room:kick', { id: b.dataset.kick })));
+    $$('[data-kick]').forEach((b) => (b.onclick = () => emit('kick', { id: b.dataset.kick })));
 
     $('#hostControls').hidden = !r.isHost;
     $('#setMax').value = String(r.maxPlayers);
@@ -469,15 +510,15 @@
       : '방장이 게임을 시작하기를 기다리는 중...';
   }
 
-  $('#setMax').onchange = (e) => emit('room:settings', { maxPlayers: e.target.value });
-  $('#setRounds').onchange = (e) => emit('room:settings', { rounds: e.target.value });
-  $('#addBot').onclick = () => emit('room:addBot');
-  $('#startGame').onclick = () => emit('game:start');
+  $('#setMax').onchange = (e) => emit('settings', { maxPlayers: e.target.value });
+  $('#setRounds').onchange = (e) => emit('settings', { rounds: e.target.value });
+  $('#addBot').onclick = () => emit('addBot');
+  $('#startGame').onclick = () => emit('start');
   $('#copyCode').onclick = () => copyInvite(state.room.code);
   $('#leaveRoom').onclick = async () => {
     const g = state.room?.game;
     if (g && g.phase === 'playing' && !confirm('게임을 떠나면 봇이 대신 플레이합니다. 나가시겠습니까?')) return;
-    await emit('room:leave');
+    await emit('leave');
     state.room = null;
     state.shownRoundResult = null;
     $('#navGame').hidden = true;
@@ -504,13 +545,21 @@
     $('#opponents').innerHTML = rotated.map((p) => {
       const turn = g.phase === 'playing' && g.current === p.seat;
       const backs = Array.from({ length: Math.min(p.count, 8) }, () => '<div class="tile back"></div>').join('');
+      const member = r.memberList.find((m) => m.id === p.id);
+      const online = !member || member.online;
+      const stalled = turn && !p.isBot && g.lastMoveAt && Date.now() - g.lastMoveAt > STALL_MS;
       return `
         <div class="opp ${turn ? 'turn' : ''}">
-          <span class="avatar ring ${p.isBot ? 'bot' : ''}">${esc(memberAvatar(p.id))}</span>
+          <span class="avatar ring ${p.isBot ? 'bot' : ''}">${esc(memberAvatar(p.id))}<span class="online-dot ${online ? '' : 'off'}"></span></span>
           <div class="meta"><strong>${esc(p.name)}</strong><span>${p.count}개 · 벌점 ${p.score}</span></div>
-          <div class="mini-backs">${backs}</div>
+          ${stalled ? `<button class="btn sm" data-replace="${esc(p.id)}" title="응답이 없는 플레이어를 봇으로 대체">🤖 봇으로 대체</button>` : `<div class="mini-backs">${backs}</div>`}
         </div>`;
     }).join('');
+    $$('[data-replace]').forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      if ((await emit('replace', { id: b.dataset.replace })).ok) toast('봇이 대신 플레이합니다');
+      b.disabled = false;
+    }));
 
     $('#roundChip').textContent = `라운드 ${g.round}/${g.maxRounds}`;
     $('#pileChip').textContent = `🂠 더미 ${g.drawPile}`;
@@ -586,11 +635,11 @@
   $('#clearSel').onclick = () => { state.selected.clear(); renderBoard(); };
   $('#playBtn').onclick = async () => {
     const ids = [...state.selected];
-    const res = await emit('game:play', { tileIds: ids });
+    const res = await emit('play', { tileIds: ids });
     if (res.ok) state.selected.clear();
   };
   $('#passBtn').onclick = async () => {
-    const res = await emit('game:pass');
+    const res = await emit('pass');
     if (res.ok && res.drew) toast('타일 1개를 가져왔습니다');
   };
 
@@ -629,9 +678,9 @@
         </div>
       </div>`, { wide: true });
     const next = $('#resNext', box);
-    if (next) next.onclick = async () => { if ((await emit('game:next')).ok) closeModal(); };
+    if (next) next.onclick = async () => { if ((await emit('next')).ok) closeModal(); };
     const again = $('#resAgain', box);
-    if (again) again.onclick = async () => { if ((await emit('game:reset')).ok) { closeModal(); state.shownRoundResult = null; } };
+    if (again) again.onclick = async () => { if ((await emit('reset')).ok) { closeModal(); state.shownRoundResult = null; } };
   }
 
   /* ---------------- 채팅 ---------------- */
@@ -688,7 +737,7 @@
     const text = input.value.trim();
     if (!text) return;
     input.value = '';
-    await emit('chat:send', { text });
+    await emit('chat', { text });
   };
   function openChat() {
     state.chatOpen = true;
@@ -709,4 +758,11 @@
   });
 
   setInterval(() => { if (state.view === 'home') renderLobby(); }, 30000);
-})();
+  // 응답 없는 플레이어 감지(봇 대체 버튼)를 위해 게임 화면을 주기적으로 갱신
+  setInterval(() => {
+    const g = state.room?.game;
+    if (state.view === 'game' && g?.phase === 'playing' && g.lastMoveAt && Date.now() - g.lastMoveAt > STALL_MS - 5000) renderBoard();
+  }, 5000);
+
+  boot();
+}

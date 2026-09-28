@@ -1,7 +1,6 @@
-'use strict';
-const test = require('node:test');
-const assert = require('node:assert');
-const { createDeck, interpret, beats, chooseInterpretation, SixteenGame, botMove } = require('../src/game');
+import test from 'node:test';
+import assert from 'node:assert';
+import { createDeck, interpret, beats, chooseInterpretation, SixteenGame, botMove } from '../supabase/functions/_shared/game.js';
 
 const t = (n, c = 'red', id = Math.random()) => ({ id, n, c });
 const J = () => t(0, 'joker');
@@ -93,4 +92,23 @@ test('viewFor는 다른 사람의 손패를 숨긴다', () => {
   const v = g.viewFor('a');
   assert.strictEqual(v.hand.length, 16);
   assert.ok(v.players.every((p) => p.hand === undefined && typeof p.count === 'number'));
+});
+
+test('toJSON/fromJSON 으로 저장했다 불러와도 게임이 이어진다', () => {
+  const g = new SixteenGame([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], { rng: seeded(11) });
+  const id = g.players[g.current].id;
+  g.play(id, [g.players[g.current].hand[0].id]);
+  const restored = SixteenGame.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  assert.deepStrictEqual(restored.publicView(), g.publicView());
+  assert.strictEqual(restored.rng, Math.random);
+  const next = restored.players[restored.current];
+  restored.pass(next.id);
+  assert.strictEqual(restored.table, null);
+});
+
+test('public/game.js 는 엔진 원본과 동일하다 (npm run sync)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../supabase/functions/_shared/game.js', import.meta.url), 'utf8');
+  const pub = await readFile(new URL('../public/game.js', import.meta.url), 'utf8');
+  assert.strictEqual(pub, src, 'npm run sync 를 실행하세요');
 });

@@ -1,22 +1,20 @@
 {
   "name": "boardgame-sixteen",
-  "version": "1.0.0",
-  "description": "보드게임 식스틴(Sixteen) 온라인 멀티플레이",
-  "main": "server.js",
+  "version": "2.0.0",
+  "description": "보드게임 식스틴(Sixteen) 온라인 멀티플레이 — Supabase 기반",
+  "type": "module",
+  "private": true,
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js"
+    "dev": "node scripts/serve.mjs",
+    "sync": "node scripts/sync-engine.mjs",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node --test --test-force-exit test/e2e-supabase.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "license": "MIT",
-  "dependencies": {
-    "express": "^5.2.1",
-    "socket.io": "^4.8.4"
-  },
   "devDependencies": {
-    "socket.io-client": "^4.8.4"
+    "@supabase/supabase-js": "^2.117.2"
   }
 }

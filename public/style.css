@@ -292,6 +292,7 @@ select, .input {
   background: var(--surface); border: 1px solid var(--border); flex: none; transition: box-shadow .2s, transform .2s;
 }
 .opp .avatar { --size: 40px; }
+.opp .online-dot { width: 11px; height: 11px; bottom: 0; right: 0; }
 .opp .avatar.ring::before { background: var(--border); }
 .opp.turn { box-shadow: 0 0 0 2px #d62976 inset, var(--shadow); transform: translateY(-2px); }
 .opp.turn .avatar.ring::before { background: var(--ig); animation: spin 2.4s linear infinite; }
