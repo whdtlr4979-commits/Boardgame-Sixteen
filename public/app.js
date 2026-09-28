@@ -229,12 +229,8 @@ import { createNet } from './net.js';
         <form id="createForm">
           <div class="field"><label class="lbl">방 이름</label>
             <input class="input" id="crName" maxlength="30" placeholder="${esc((state.me?.name || '나') + '님의 식스틴')}" /></div>
-          <div class="field" style="display:flex;gap:12px">
-            <div style="flex:1"><label class="lbl">최대 인원</label>
-              <select class="input" id="crMax"><option>2</option><option>3</option><option selected>4</option><option>5</option></select></div>
-            <div style="flex:1"><label class="lbl">라운드 수</label>
-              <select class="input" id="crRounds"><option>1</option><option>2</option><option selected>3</option><option>5</option><option>7</option><option>10</option></select></div>
-          </div>
+          <div class="field"><label class="lbl">최대 인원</label>
+            <select class="input" id="crMax"><option>2</option><option>3</option><option selected>4</option></select></div>
           <div class="modal-actions"><button class="btn" type="button" data-close>취소</button><button class="btn primary" type="submit">만들기</button></div>
         </form>
       </div>`);
@@ -244,7 +240,6 @@ import { createNet } from './net.js';
         profile: state.me,
         name: $('#crName', box).value,
         maxPlayers: $('#crMax', box).value,
-        rounds: $('#crRounds', box).value,
       });
       if (res.ok) { closeModal(); go('game'); }
     };
@@ -272,7 +267,7 @@ import { createNet } from './net.js';
   }
 
   async function quickPlay() {
-    const res = await emit('create', { profile: state.me, name: `${state.me?.name || ''}의 연습 게임`, maxPlayers: 4, rounds: 3 });
+    const res = await emit('create', { profile: state.me, name: `${state.me?.name || ''}의 연습 게임`, maxPlayers: 4 });
     if (!res.ok) return;
     await emit('addBot');
     await emit('addBot');
@@ -282,34 +277,42 @@ import { createNet } from './net.js';
   }
 
   /* ---------------- 규칙 ---------------- */
-  const tileHTML = (t, cls = '') =>
-    `<div class="tile ${t.n === 0 ? 'joker' : t.c} ${cls}" data-id="${t.id ?? ''}">${t.n === 0 ? '' : t.n}</div>`;
-  const T = (n, c) => ({ n, c });
+  const FACES = { restart: '<small>16</small><b>↻</b>', end: '<small>16</small><b>END</b>', scissors: '✂', trash: '🗑' };
+  const tileHTML = (t, cls = '') => {
+    const k = t.k || 'num';
+    return `<div class="tile ${t.c || 'none'} k-${k} ${cls}" data-id="${t.id ?? ''}" title="${esc(Sixteen.describeTile({ k, ...t }))}">${k === 'num' ? t.n : FACES[k]}</div>`;
+  };
+  const T = (n, c, k = 'num') => ({ n, c, k });
 
   function showRules(back) {
     const box = openModal(`
       <div class="modal-head">식스틴 게임 규칙${closeBtn}</div>
       <div class="modal-body rules">
         <h4>🎯 목표</h4>
-        <p>손에 든 타일을 가장 먼저 모두 내려놓으세요. 라운드가 끝나면 남은 타일 숫자의 합이 벌점이 되고, 모든 라운드 후 <b>벌점이 가장 적은 사람</b>이 우승합니다.</p>
+        <p>가림막 뒤의 타일을 <b>가장 먼저 모두 내려놓으면</b> 승리합니다. 아무도 더 놓을 수 없게 되면 <b>남은 타일 숫자의 합이 가장 적은 사람</b>이 승리합니다.</p>
         <h4>🧩 구성물 (88개)</h4>
-        <div class="example">${['red', 'yellow', 'green', 'blue', 'purple'].map((c) => tileHTML(T(16, c), 'sm')).join('')}${tileHTML(T(0, 'joker'), 'sm')}</div>
-        <ul><li>빨강·노랑·초록·파랑·보라 5가지 색 × 숫자 1~16 = 80개</li><li>조커 8개 — 어떤 숫자로도 사용 가능 (남으면 벌점 20점)</li></ul>
-        <h4>🃏 준비</h4>
-        <p>2~3인은 16개, 4~5인은 14개씩 받습니다. 타일은 가림막 뒤에서 자동으로 오름차순 정렬되며 다른 사람은 개수만 볼 수 있습니다. 나머지는 뽑기 더미가 됩니다.</p>
-        <h4>▶️ 진행</h4>
-        <p>선 플레이어가 아래 조합 중 하나를 내려놓고, 시계 방향으로 돌아갑니다.</p>
+        <div class="example">${['red', 'yellow', 'green', 'blue', 'purple'].map((c) => tileHTML(T(15, c), 'sm')).join('')}
+          ${tileHTML(T(16, 'red', 'restart'), 'sm')}${tileHTML(T(16, 'red', 'end'), 'sm')}${tileHTML(T(0, null, 'scissors'), 'sm')}${tileHTML(T(0, null, 'trash'), 'sm')}</div>
         <ul>
-          <li><b>싱글</b> — 타일 1개</li>
-          <li><b>세트</b> — 같은 숫자 2개 이상 (색 무관)</li>
-          <li><b>런</b> — 연속된 숫자 3개 이상 (색 무관)</li>
+          <li>빨강·노랑·초록·파랑·보라 5색 × (숫자 1~15 + <b>16 RESTART</b> + <b>16 END</b>) = 85개</li>
+          <li><b>가위</b> 2개, <b>쓰레기통</b> 1개</li>
         </ul>
-        <p>다음 사람은 <b>같은 형태·같은 개수</b>이면서 <b>더 높은 숫자</b>의 조합으로 덮어야 합니다. (세트는 숫자, 런은 가장 높은 숫자로 비교)</p>
-        <div class="example">${tileHTML(T(5, 'red'), 'sm')}${tileHTML(T(6, 'blue'), 'sm')}${tileHTML(T(7, 'green'), 'sm')}<span class="vs">→</span>${tileHTML(T(8, 'yellow'), 'sm')}${tileHTML(T(9, 'purple'), 'sm')}${tileHTML(T(0, 'joker'), 'sm')}</div>
-        <p>낼 수 없거나 내고 싶지 않으면 <b>패스</b>하고 더미에서 타일 1개를 가져옵니다. 나머지 모두가 연속으로 패스하면 마지막으로 낸 사람이 테이블을 정리하고 새로 선이 됩니다.</p>
-        <h4>🏁 라운드 종료</h4>
-        <p>누군가 손패를 모두 내려놓으면 라운드가 끝납니다. 나머지 플레이어는 남은 숫자의 합을 벌점으로 받습니다.</p>
-        <p class="note">※ 이 사이트는 식스틴의 핵심 구성(5색 × 1~16 타일, 연속 숫자 내려놓기, 타일을 빨리 털어내 숫자 합을 최소화)을 바탕으로 온라인 플레이에 맞게 정리한 규칙입니다. 세부 규칙은 공식 룰북과 다를 수 있습니다.</p>
+        <h4>🃏 준비</h4>
+        <p>2인은 30개, 3인은 29개, 4인은 22개씩 나눠 받고 나머지는 사용하지 않습니다. <b>1 타일 5개를 모두 꺼내</b> 색깔별 줄 5개를 시작합니다. 타일은 가림막 뒤에서 자동으로 정렬되며 다른 사람은 개수만 볼 수 있습니다.</p>
+        <h4>▶️ 진행</h4>
+        <p>자기 차례에 <b>같은 색 타일 1개</b> 또는 <b>같은 색의 연속된 숫자 여러 개</b>를 그 색 줄 끝에 놓습니다. 줄 끝보다 <b>큰 숫자만</b> 놓을 수 있고, 숫자를 건너뛸 수도 있습니다.</p>
+        <div class="example">${tileHTML(T(1, 'red'), 'sm')}${tileHTML(T(4, 'red'), 'sm')}<span class="vs">+</span>${tileHTML(T(5, 'red'), 'sm')}${tileHTML(T(6, 'red'), 'sm')}${tileHTML(T(7, 'red'), 'sm')}<span class="vs">또는</span>${tileHTML(T(12, 'red'), 'sm')}</div>
+        <p class="note">건너뛴 숫자(위 예에서 12를 놓으면 빨강 5~11)는 그 줄에 더 이상 놓을 수 없습니다.</p>
+        <h4>✨ 특수 타일</h4>
+        <ul>
+          <li>${tileHTML(T(16, 'blue', 'restart'), 'sm inline')} <b>RESTART</b> — 16으로 놓이고, 이후 0으로 취급되어 그 줄을 처음부터 다시 이어갈 수 있습니다.</li>
+          <li>${tileHTML(T(16, 'blue', 'end'), 'sm inline')} <b>END</b> — 16으로 놓이고, 그 줄을 닫습니다.</li>
+          <li>${tileHTML(T(0, null, 'scissors'), 'sm inline')} <b>가위</b> — 원하는 줄의 마지막 타일 1개를 제거합니다.</li>
+          <li>${tileHTML(T(0, null, 'trash'), 'sm inline')} <b>쓰레기통</b> — 원하는 줄을 1만 남기고 모두 비웁니다.</li>
+        </ul>
+        <h4>⏭️ 패스와 종료</h4>
+        <p>놓을 수 있는 타일이 <b>없을 때만</b> 패스합니다. 누군가 타일을 모두 내려놓거나, 모두가 연속으로 패스하면 게임이 끝납니다. 남은 타일은 숫자 값(RESTART·END는 16, 가위·쓰레기통은 0)만큼 벌점이 됩니다.</p>
+        <p class="note">※ 공식 구성물과 룰 설명을 바탕으로 구현했습니다. 가위·쓰레기통의 벌점(0점)처럼 확인되지 않은 세부 사항은 공식 룰북과 다를 수 있습니다.</p>
         <div class="modal-actions"><button class="btn primary" id="rulesOk">확인</button></div>
       </div>`, { wide: true, dismissable: !back });
     const done = () => (back ? back() : closeModal());
@@ -406,7 +409,7 @@ import { createNet } from './net.js';
             <button class="btn ${canJoin ? 'primary' : ''} sm" data-join="${esc(r.code)}" ${canJoin ? '' : 'disabled'}>${canJoin ? '참가하기' : (full ? '정원 마감' : '진행 중')}</button>
             <button class="icon-btn" data-share="${esc(r.code)}" aria-label="초대 링크 복사"><svg viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
             <span class="spacer"></span>
-            <span class="muted">${r.rounds}라운드</span>
+            <span class="muted">최대 ${r.maxPlayers}인</span>
           </div>
           <div class="post-body">
             <div class="members"><div class="stack">${r.members.map((m) => `<span class="avatar ${m.isBot ? 'bot' : ''}">${esc(m.avatar)}</span>`).join('')}</div>
@@ -433,7 +436,7 @@ import { createNet } from './net.js';
     // 새로 받은 타일 강조
     if (g && g.hand) {
       const ids = new Set(g.hand.map((t) => t.id));
-      if (state.prevHandIds && prev?.game?.round === g.round) {
+      if (state.prevHandIds && prev?.game?.phase === 'playing' && g.phase === 'playing') {
         state.newIds = new Set([...ids].filter((id) => !state.prevHandIds.has(id)));
       } else state.newIds = new Set();
       state.prevHandIds = ids;
@@ -448,9 +451,9 @@ import { createNet } from './net.js';
     if (state.view !== 'game') go('game');
     else renderRoom();
 
-    // 라운드/게임 결과
-    if (g && (g.phase === 'roundEnd' || g.phase === 'finished')) {
-      const key = `${g.round}-${g.phase}`;
+    // 게임 결과
+    if (g && g.phase === 'finished') {
+      const key = `fin-${g.lastMoveAt}`;
       if (state.shownRoundResult !== key) {
         state.shownRoundResult = key;
         setTimeout(() => showRoundResult(), 500);
@@ -472,7 +475,7 @@ import { createNet } from './net.js';
     if (!r) return;
     $('#roomName').textContent = r.name;
     $('#roomCode').textContent = r.code;
-    $('#roomMeta').textContent = `${r.members.length}/${r.maxPlayers}명 · ${r.rounds}라운드 · 방장 ${r.host}`;
+    $('#roomMeta').textContent = `${r.members.length}/${r.maxPlayers}명 · 방장 ${r.host}`;
     const g = r.game;
     $('#waiting').hidden = !!g;
     $('#board').hidden = !g;
@@ -502,7 +505,6 @@ import { createNet } from './net.js';
 
     $('#hostControls').hidden = !r.isHost;
     $('#setMax').value = String(r.maxPlayers);
-    $('#setRounds').value = String(r.rounds);
     $('#addBot').disabled = r.members.length >= r.maxPlayers;
     $('#startGame').disabled = r.members.length < 2;
     $('#waitHint').textContent = r.isHost
@@ -511,7 +513,6 @@ import { createNet } from './net.js';
   }
 
   $('#setMax').onchange = (e) => emit('settings', { maxPlayers: e.target.value });
-  $('#setRounds').onchange = (e) => emit('settings', { rounds: e.target.value });
   $('#addBot').onclick = () => emit('addBot');
   $('#startGame').onclick = () => emit('start');
   $('#copyCode').onclick = () => copyInvite(state.room.code);
@@ -551,7 +552,7 @@ import { createNet } from './net.js';
       return `
         <div class="opp ${turn ? 'turn' : ''}">
           <span class="avatar ring ${p.isBot ? 'bot' : ''}">${esc(memberAvatar(p.id))}<span class="online-dot ${online ? '' : 'off'}"></span></span>
-          <div class="meta"><strong>${esc(p.name)}</strong><span>${p.count}개 · 벌점 ${p.score}</span></div>
+          <div class="meta"><strong>${esc(p.name)}</strong><span>타일 ${p.count}개${g.phase === 'finished' ? ` · ${p.score}점` : ''}</span></div>
           ${stalled ? `<button class="btn sm" data-replace="${esc(p.id)}" title="응답이 없는 플레이어를 봇으로 대체">🤖 봇으로 대체</button>` : `<div class="mini-backs">${backs}</div>`}
         </div>`;
     }).join('');
@@ -561,26 +562,34 @@ import { createNet } from './net.js';
       b.disabled = false;
     }));
 
-    $('#roundChip').textContent = `라운드 ${g.round}/${g.maxRounds}`;
-    $('#pileChip').textContent = `🂠 더미 ${g.drawPile}`;
-    $('#comboChip').textContent = g.table ? `현재: ${g.table.label}` : '선: 자유롭게 내세요';
+    $('#discardChip').textContent = `🗑 버린 타일 ${g.discard}`;
+    $('#unusedChip').textContent = `미사용 ${g.unused}`;
+    $('#unusedChip').hidden = !g.unused;
+    const lastLog = g.log[g.log.length - 1];
+    $('#lastChip').textContent = lastLog ? lastLog.text : '';
 
-    if (g.table) {
-      const by = g.players[g.table.by];
-      $('#tableBy').innerHTML = `<span class="avatar">${esc(memberAvatar(by.id))}</span> ${esc(by.name)}님이 냈습니다`;
-      $('#tableTiles').innerHTML = g.table.tiles.map((t) => tileHTML(t, 'lg')).join('');
-    } else {
-      $('#tableBy').innerHTML = '';
-      $('#tableTiles').innerHTML = '<div class="placeholder">테이블이 비어 있습니다<br><small>싱글 · 세트 · 런 무엇이든 낼 수 있어요</small></div>';
-    }
+    $('#rows').innerHTML = g.rows.map((row) => {
+      const tiles = row.tiles.length > 10 ? [row.tiles[0], null, ...row.tiles.slice(-8)] : row.tiles;
+      const justPlayed = g.lastPlay && g.lastPlay.row === row.color;
+      return `
+        <div class="row ${row.closed ? 'closed' : ''} ${justPlayed ? 'just' : ''}" data-row="${row.color}">
+          <span class="row-label ${row.color}">${Sixteen.COLOR_NAMES[row.color]}</span>
+          <div class="row-tiles">${tiles.map((t) => (t ? tileHTML(t, 'md') : '<span class="row-gap">…</span>')).join('')}</div>
+          <span class="row-top">${row.closed ? '■ 닫힘' : row.top === 0 ? '↻ 1부터' : `${row.top} 초과`}</span>
+        </div>`;
+    }).join('');
+    $$('#rows .row').forEach((el) => (el.onclick = () => playOnRow(el.dataset.row)));
+
     const cur = g.players[g.current];
+    const hand = g.hand || [];
+    const canMove = myTurn && Sixteen.hasLegalMove(g.rows, hand);
     const banner = $('#turnBanner');
     if (g.phase !== 'playing') {
       banner.className = 'turn-banner';
-      banner.textContent = g.phase === 'finished' ? '🏆 게임 종료' : '라운드 종료';
+      banner.textContent = '🏆 게임 종료';
     } else if (myTurn) {
       banner.className = 'turn-banner mine';
-      banner.textContent = g.table ? '내 차례! 더 높은 조합을 내거나 패스하세요' : '내 차례! 선입니다';
+      banner.textContent = canMove ? '내 차례! 같은 색 줄 끝보다 큰 숫자를 놓으세요' : '놓을 수 있는 타일이 없어요 — 패스하세요';
     } else {
       banner.className = 'turn-banner';
       banner.textContent = `${cur.name}님의 차례${cur.isBot ? ' 🤖 생각 중…' : '…'}`;
@@ -590,13 +599,13 @@ import { createNet } from './net.js';
     const mine = g.players[me];
     $('#handAvatar').textContent = state.me?.avatar || '🙂';
     $('#handName').textContent = mine ? mine.name : '관전 중';
-    $('#handInfo').textContent = mine ? `타일 ${mine.count}개 · 누적 벌점 ${mine.score}` : '';
-    const hand = g.hand || [];
+    const handSum = hand.reduce((sum, t) => sum + Sixteen.tilePenalty(t), 0);
+    $('#handInfo').textContent = mine ? `타일 ${mine.count}개 · 남은 숫자 합 ${handSum}` : '';
     $('#hand').innerHTML = hand.map((t) =>
       tileHTML(t, `${state.selected.has(t.id) ? 'sel' : ''} ${state.newIds.has(t.id) ? 'new' : ''}`)).join('');
     $$('#hand .tile').forEach((el) => (el.onclick = () => toggleTile(Number(el.dataset.id))));
-    $('#passBtn').disabled = !myTurn || !g.table;
-    $('#passBtn').textContent = g.drawPile ? '패스 · 1장 뽑기' : '패스';
+    $('#passBtn').disabled = !myTurn || canMove;
+    $('#passBtn').textContent = '패스';
     updateSelection();
   }
 
@@ -607,78 +616,95 @@ import { createNet } from './net.js';
     updateSelection();
   }
 
+  /** 현재 선택을 검사: { tiles, v } (v = validatePlay 결과, 줄이 필요한 특수 타일은 needsRow) */
+  function currentSelection(rowColor) {
+    const g = state.room?.game;
+    const hand = g?.hand || [];
+    const tiles = hand.filter((t) => state.selected.has(t.id));
+    if (!g || !tiles.length) return { tiles, v: null };
+    return { tiles, v: Sixteen.validatePlay(g.rows, tiles, rowColor) };
+  }
+
   function updateSelection() {
     const g = state.room?.game;
     const info = $('#selectionInfo');
-    const hand = g?.hand || [];
-    const tiles = hand.filter((t) => state.selected.has(t.id));
     const myTurn = g && g.phase === 'playing' && g.current === mySeat();
+    const { tiles, v } = currentSelection();
     info.className = 'selection-info';
+    $$('#rows .row').forEach((el) => el.classList.remove('target'));
+    $('#playBtn').disabled = true;
     if (!tiles.length) {
-      info.textContent = myTurn ? '낼 타일을 선택하세요' : '타일을 미리 골라둘 수 있어요';
-      $('#playBtn').disabled = true;
+      info.textContent = myTurn ? '놓을 타일을 선택하세요' : '타일을 미리 골라둘 수 있어요';
       return;
     }
-    const table = g.table ? g.table.combo : null;
-    const combo = Sixteen.chooseInterpretation(tiles, table);
-    if (combo) {
-      info.textContent = `✓ ${Sixteen.describeCombo(combo)}`;
+    const special = tiles.length === 1 && Sixteen.isColorless(tiles[0]);
+    if (special) {
+      const targets = g.rows.filter((r) => Sixteen.validatePlay(g.rows, tiles, r.color).ok);
+      targets.forEach((r) => $(`#rows .row[data-row="${r.color}"]`)?.classList.add('target'));
+      info.textContent = targets.length ? `${Sixteen.describeTile(tiles[0])} — 사용할 줄을 누르세요` : '✕ 사용할 수 있는 줄이 없어요';
+      info.classList.add(targets.length ? 'ok' : 'bad');
+      return;
+    }
+    if (v.ok) {
+      info.textContent = `✓ ${v.label}`;
       info.classList.add('ok');
+      $(`#rows .row[data-row="${v.row}"]`)?.classList.add('target');
+      $('#playBtn').disabled = !myTurn;
     } else {
-      const any = Sixteen.interpret(tiles)[0];
-      info.textContent = any ? `✕ ${Sixteen.describeCombo(any)} — 테이블보다 높아야 해요` : '✕ 올바른 조합이 아니에요';
+      info.textContent = `✕ ${v.error}`;
       info.classList.add('bad');
     }
-    $('#playBtn').disabled = !combo || !myTurn;
+  }
+
+  async function play(rowColor) {
+    const { tiles, v } = currentSelection(rowColor);
+    if (!v || !v.ok) {
+      if (v) toast(v.error, true);
+      return;
+    }
+    const res = await emit('play', { tileIds: tiles.map((t) => t.id), row: v.row });
+    if (res.ok) state.selected.clear();
+  }
+
+  function playOnRow(rowColor) {
+    const g = state.room?.game;
+    if (!g || g.phase !== 'playing' || g.current !== mySeat() || !state.selected.size) return;
+    play(rowColor);
   }
 
   $('#clearSel').onclick = () => { state.selected.clear(); renderBoard(); };
-  $('#playBtn').onclick = async () => {
-    const ids = [...state.selected];
-    const res = await emit('play', { tileIds: ids });
-    if (res.ok) state.selected.clear();
-  };
-  $('#passBtn').onclick = async () => {
-    const res = await emit('pass');
-    if (res.ok && res.drew) toast('타일 1개를 가져왔습니다');
-  };
+  $('#playBtn').onclick = () => play();
+  $('#passBtn').onclick = () => emit('pass');
 
   function showRoundResult() {
     const g = state.room?.game;
     if (!g || !g.lastRound) return;
-    const final = g.phase === 'finished';
     const lr = g.lastRound;
-    const rows = final
-      ? g.standings.map((s, i) => `
-          <li class="result-row ${i === 0 ? 'winner' : ''}">
-            <span class="rank">${['🥇', '🥈', '🥉'][i] || i + 1}</span>
-            <span class="avatar">${esc(memberAvatar(s.id))}</span>
-            <div class="info"><strong>${esc(s.name)}</strong></div>
-            <span class="pts">${s.score}점</span>
-          </li>`).join('')
-      : lr.results.map((res, i) => `
-          <li class="result-row ${i === lr.winner ? 'winner' : ''}">
-            <span class="rank">${i === lr.winner ? '👑' : ''}</span>
+    const order = g.standings.map((s) => lr.results.findIndex((r) => r.id === s.id));
+    const rows = order.map((idx, rank) => {
+      const res = lr.results[idx];
+      return `
+          <li class="result-row ${idx === lr.winner ? 'winner' : ''}">
+            <span class="rank">${idx === lr.winner ? '👑' : rank + 1}</span>
             <span class="avatar">${esc(memberAvatar(res.id))}</span>
             <div class="info"><strong>${esc(res.name)}</strong>
-              <div class="rem">${res.remaining.slice(0, 16).map((t) => tileHTML(t, 'sm')).join('')}</div></div>
-            <span class="pts">+${res.penalty}</span>
-          </li>`).join('');
-    const winnerName = final ? g.standings[0].name : lr.results[lr.winner].name;
+              <div class="rem">${res.remaining.length ? res.remaining.slice(0, 20).map((t) => tileHTML(t, 'sm')).join('') : '<span class="muted">모두 내려놓음 🎉</span>'}</div></div>
+            <span class="pts">${res.penalty}점</span>
+          </li>`;
+    }).join('');
+    const winnerName = lr.results[lr.winner].name;
     const box = openModal(`
-      <div class="modal-head">${final ? '최종 결과' : `라운드 ${g.round} 결과`}${closeBtn}</div>
+      <div class="modal-head">게임 결과${closeBtn}</div>
       <div class="modal-body">
-        <div class="trophy">${final ? '🏆' : '🎉'}</div>
-        <p class="center"><b>${esc(winnerName)}</b>님이 ${final ? '최종 우승했습니다!' : '라운드에서 이겼습니다!'}</p>
+        <div class="trophy">🏆</div>
+        <p class="center"><b>${esc(winnerName)}</b>님 승리! ${lr.emptied ? '타일을 모두 내려놓았습니다.' : '아무도 더 놓을 수 없어 남은 숫자 합으로 결정되었습니다.'}</p>
         <ul class="result-list">${rows}</ul>
         <div class="modal-actions">
           ${state.room.isHost
-            ? (final ? '<button class="btn gradient" id="resAgain">대기실로 · 다시 하기</button>' : '<button class="btn primary" id="resNext">다음 라운드 시작</button>')
-            : `<button class="btn" data-close>${final ? '닫기' : '방장이 다음 라운드를 시작합니다'}</button>`}
+            ? '<button class="btn gradient" id="resAgain">대기실로 · 다시 하기</button>'
+            : '<button class="btn" data-close>닫기</button>'}
         </div>
       </div>`, { wide: true });
-    const next = $('#resNext', box);
-    if (next) next.onclick = async () => { if ((await emit('next')).ok) closeModal(); };
     const again = $('#resAgain', box);
     if (again) again.onclick = async () => { if ((await emit('reset')).ok) { closeModal(); state.shownRoundResult = null; } };
   }
@@ -706,13 +732,12 @@ import { createNet } from './net.js';
     log.innerHTML = g ? g.log.slice().reverse().map((l) => `<div class="log-item">${esc(l.text)}</div>`).join('') : '<div class="sys">게임이 시작되면 기록이 표시됩니다</div>';
 
     if (g) {
-      const rounds = Array.from({ length: g.maxRounds }, (_, i) => i + 1);
-      const lead = Math.min(...g.players.map((p) => p.score));
+      const done = g.phase === 'finished';
       $('#scoreBody').innerHTML = `
         <table class="score-table">
-          <thead><tr><th>플레이어</th>${rounds.map((n) => `<th>R${n}</th>`).join('')}<th>합계</th></tr></thead>
-          <tbody>${g.players.map((p) => `<tr class="${p.score === lead ? 'lead' : ''}"><td>${esc(memberAvatar(p.id))} ${esc(p.name)}</td>${rounds.map((_, i) => `<td>${p.roundScores[i] ?? '–'}</td>`).join('')}<td>${p.score}</td></tr>`).join('')}</tbody>
-        </table><p class="muted center" style="margin-top:12px">벌점이 적을수록 좋아요</p>`;
+          <thead><tr><th>플레이어</th><th>남은 타일</th><th>${done ? '벌점' : ''}</th></tr></thead>
+          <tbody>${g.players.map((p, i) => `<tr class="${done && g.lastRound.winner === i ? 'lead' : ''}"><td>${esc(memberAvatar(p.id))} ${esc(p.name)}</td><td>${p.count}</td><td>${done ? p.score : ''}</td></tr>`).join('')}</tbody>
+        </table><p class="muted center" style="margin-top:12px">먼저 다 내려놓거나, 끝났을 때 남은 숫자 합이 가장 적으면 승리</p>`;
     } else $('#scoreBody').innerHTML = '<div class="sys">아직 점수가 없습니다</div>';
 
     const userMsgs = r.chat.filter((m) => !m.system).length;

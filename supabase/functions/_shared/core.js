@@ -241,7 +241,7 @@ export function createCore(db, opts = {}) {
       return { code: room.code };
     },
 
-    async create(userId, { profile, name, maxPlayers, rounds }) {
+    async create(userId, { profile, name, maxPlayers }) {
       const p = profileOf(profile);
       await leave(userId);
       await db.cleanup();
@@ -252,7 +252,7 @@ export function createCore(db, opts = {}) {
           name: clean(name, 30) || `${p.name}님의 식스틴`,
           host_id: userId,
           max_players: clamp(maxPlayers, MIN_PLAYERS, MAX_PLAYERS, 4),
-          rounds: clamp(rounds, 1, 10, 3),
+          rounds: 1, // 공식 규칙: 한 판으로 승부
           status: 'waiting',
           members: [{ id: randomId(), userId, name: p.name, avatar: p.avatar, isBot: false }],
           version: 0,
@@ -317,13 +317,12 @@ export function createCore(db, opts = {}) {
       return { code: room.code };
     },
 
-    async settings(userId, { maxPlayers, rounds }) {
+    async settings(userId, { maxPlayers }) {
       const room = await requireRoomOf(userId);
       requireHost(room, userId);
       await mutateRoom(room.code, (r) => {
         if (r.status === 'playing') throw new UserError('게임 중에는 변경할 수 없습니다.');
         if (maxPlayers) r.max_players = clamp(maxPlayers, Math.max(MIN_PLAYERS, r.members.length), MAX_PLAYERS, r.max_players);
-        if (rounds) r.rounds = clamp(rounds, 1, 10, r.rounds);
         return undefined;
       });
       return { code: room.code };
@@ -334,33 +333,22 @@ export function createCore(db, opts = {}) {
       requireHost(room, userId);
       if (room.status === 'playing') throw new UserError('이미 게임이 진행 중입니다.');
       if (room.members.length < MIN_PLAYERS) throw new UserError(`최소 ${MIN_PLAYERS}명이 필요합니다. 봇을 추가해 보세요.`);
-      const game = new SixteenGame(
-        room.members.map((m) => ({ id: m.id, name: m.name, isBot: m.isBot })),
-        { rounds: room.rounds },
-      );
+      if (room.members.length > MAX_PLAYERS) throw new UserError(`최대 ${MAX_PLAYERS}명까지 플레이할 수 있습니다.`);
+      const game = new SixteenGame(room.members.map((m) => ({ id: m.id, name: m.name, isBot: m.isBot })));
       await commit(room.code, game, null, room);
       await system(room.code, '게임이 시작되었습니다! 행운을 빌어요 🍀');
       return { code: room.code, runBots: true };
     },
 
-    async play(userId, { tileIds }) {
+    async play(userId, { tileIds, row }) {
       const { code, result } = await gameAction(userId, (game, me) =>
-        game.play(me.id, (Array.isArray(tileIds) ? tileIds : []).map(Number)));
-      return { code, runBots: true, roundOver: result.roundOver };
+        game.play(me.id, (Array.isArray(tileIds) ? tileIds : []).map(Number), row ? String(row) : undefined));
+      return { code, runBots: true, finished: result.finished };
     },
 
     async pass(userId) {
-      const { code, result } = await gameAction(userId, (game, me) => game.pass(me.id));
-      return { code, runBots: true, drew: !!result.drew };
-    },
-
-    async next(userId) {
-      const room = await requireRoomOf(userId);
-      requireHost(room, userId);
-      const { game, version } = await loadGame(room.code);
-      game.nextRound();
-      await commit(room.code, game, version, room);
-      return { code: room.code, runBots: true };
+      const { code } = await gameAction(userId, (game, me) => game.pass(me.id));
+      return { code, runBots: true };
     },
 
     async reset(userId) {
@@ -420,9 +408,8 @@ export function createCore(db, opts = {}) {
       if (!room) return;
       const id = game.players[game.current].id;
       const move = botMove(game, id);
-      if (move.action === 'play') game.play(id, move.tileIds);
-      else if (game.table) game.pass(id);
-      else game.play(id, [game.players[game.current].hand[0].id]);
+      if (move.action === 'play') game.play(id, move.tileIds, move.row);
+      else game.pass(id);
       game.lastMoveAt = now();
       const status = game.phase === 'finished' ? 'finished' : 'playing';
       try {

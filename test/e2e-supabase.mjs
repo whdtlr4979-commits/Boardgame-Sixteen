@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
+import { legalMoves } from '../supabase/functions/_shared/game.js';
 
 const URL = process.env.SUPABASE_URL;
 const KEY = process.env.SUPABASE_ANON_KEY;
@@ -33,7 +34,7 @@ test('Supabase: 방 → 게임 → Realtime → 보안 정책', { skip: !URL || 
   const a = await player('앨리스');
   const b = await player('밥');
 
-  const created = await a.call('create', { profile: a.profile, name: 'e2e', maxPlayers: 3, rounds: 1 });
+  const created = await a.call('create', { profile: a.profile, name: 'e2e', maxPlayers: 3 });
   assert.equal(created.ok, true, JSON.stringify(created));
   const code = created.code;
   assert.equal((await b.call('join', { profile: b.profile, code })).ok, true);
@@ -70,18 +71,19 @@ test('Supabase: 방 → 게임 → Realtime → 보안 정책', { skip: !URL || 
   assert.equal(view.players.length, 3);
   assert.ok(view.players.every((p) => !('hand' in p)));
 
-  // 끝까지 플레이 (사람은 선이면 가장 낮은 타일, 아니면 패스)
+  // 끝까지 플레이 (사람은 가능한 첫 번째 수, 없으면 패스)
   const room = (await a.sb.from('rooms').select('members').eq('code', code).single()).data;
   const byMember = Object.fromEntries(room.members.filter((m) => m.userId).map((m) => [m.id, m.userId === a.id ? a : b]));
   let finished = false;
-  for (let i = 0; i < 400 && !finished; i++) {
+  for (let i = 0; i < 600 && !finished; i++) {
     const g = (await a.sb.from('games').select('view').eq('room_code', code).single()).data.view;
     if (g.phase === 'finished') { finished = true; break; }
     const cur = g.players[g.current];
     const p = byMember[cur.id];
     if (!p) { await new Promise((r) => setTimeout(r, 150)); continue; } // 봇 차례: 서버가 진행
     const hand = (await p.sb.from('hands').select('tiles').eq('room_code', code).single()).data.tiles;
-    const res = g.table ? await p.call('pass') : await p.call('play', { tileIds: [hand[0].id] });
+    const moves = legalMoves(g.rows, hand);
+    const res = moves.length ? await p.call('play', moves[0]) : await p.call('pass');
     if (!res.ok && !/차례|먼저/.test(res.error)) assert.fail(res.error);
   }
   assert.ok(finished, '게임이 끝나야 함');

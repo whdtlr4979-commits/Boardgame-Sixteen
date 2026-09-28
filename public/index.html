@@ -77,11 +77,11 @@
         <div class="side-block">
           <div class="side-title"><span>한눈에 보는 규칙</span><button class="link-btn" data-nav="rules">전체 보기</button></div>
           <ul class="mini-rules">
-            <li><span class="dot red"></span>5색 × 1~16 숫자 타일 + 조커 8장</li>
-            <li><span class="dot yellow"></span>싱글 · 세트 · 3장 이상 런</li>
-            <li><span class="dot green"></span>같은 형태, 더 높은 숫자로 덮기</li>
-            <li><span class="dot blue"></span>못 내면 패스하고 1장 뽑기</li>
-            <li><span class="dot purple"></span>남은 숫자 합이 적을수록 승리</li>
+            <li><span class="dot red"></span>1 타일 5개로 색깔별 줄 시작</li>
+            <li><span class="dot yellow"></span>같은 색 줄 끝에 더 큰 숫자 놓기</li>
+            <li><span class="dot green"></span>연속된 숫자는 여러 개 한 번에</li>
+            <li><span class="dot blue"></span>RESTART · END · 가위 · 쓰레기통</li>
+            <li><span class="dot purple"></span>먼저 다 털거나 남은 합이 가장 적으면 승리</li>
           </ul>
         </div>
         <footer class="side-foot">© 2026 Sixteen Online · 소개 · 도움말 · 개인정보처리방침</footer>
@@ -106,12 +106,11 @@
           <div class="waiting-hero">
             <div class="tile-deco" aria-hidden="true"></div>
             <h3>플레이어를 기다리는 중</h3>
-            <p class="muted">초대 코드를 공유하거나 봇을 추가하고 게임을 시작하세요. (2~5인)</p>
+            <p class="muted">초대 코드를 공유하거나 봇을 추가하고 게임을 시작하세요. (2~4인)</p>
           </div>
           <ul class="member-grid" id="memberGrid"></ul>
           <div class="host-controls" id="hostControls">
-            <label>인원 <select id="setMax"><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-            <label>라운드 <select id="setRounds"><option>1</option><option>2</option><option>3</option><option>5</option><option>7</option><option>10</option></select></label>
+            <label>인원 <select id="setMax"><option>2</option><option>3</option><option>4</option></select></label>
             <button class="btn" id="addBot">🤖 봇 추가</button>
             <button class="btn primary" id="startGame">게임 시작</button>
           </div>
@@ -124,13 +123,12 @@
 
           <div class="table card">
             <div class="table-top">
-              <span class="chip" id="roundChip">라운드 1/3</span>
-              <span class="chip" id="pileChip">더미 0</span>
-              <span class="chip ghost" id="comboChip">선: 자유롭게 내세요</span>
+              <span class="chip" id="discardChip">버린 타일 0</span>
+              <span class="chip" id="unusedChip" title="인원수에 따라 사용하지 않는 타일">미사용 0</span>
+              <span class="chip ghost" id="lastChip"></span>
             </div>
             <div class="table-felt">
-              <div class="table-by" id="tableBy"></div>
-              <div class="table-tiles" id="tableTiles"></div>
+              <div class="rows" id="rows" aria-label="색깔별 줄"></div>
               <div class="turn-banner" id="turnBanner"></div>
             </div>
           </div>
