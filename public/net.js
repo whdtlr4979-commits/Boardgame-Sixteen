@@ -19,7 +19,9 @@ function signInHint(error) {
 }
 
 export function createNet(config, handlers) {
-  const sb = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
+  // 'https://xxx.supabase.co/rest/v1/' 처럼 API 경로까지 붙여 넣어도 동작하도록 기본 주소만 남긴다.
+  const url = String(config.supabaseUrl).trim().replace(/\/(rest|auth|functions|realtime)\/v1\/?.*$/, '').replace(/\/+$/, '');
+  const sb = supabase.createClient(url, String(config.supabaseAnonKey).trim(), {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: 'sixteen.auth' },
   });
 
