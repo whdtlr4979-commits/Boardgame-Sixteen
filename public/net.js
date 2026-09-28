@@ -6,6 +6,18 @@
 
 const LOBBY_LIMIT = 50;
 
+/** 익명 로그인 실패 원인별 안내 문구 */
+function signInHint(error) {
+  const msg = `${error.code || ''} ${error.message || ''}`.toLowerCase();
+  if (/anonymous.*disabled|anonymous_provider_disabled/.test(msg)) return 'Authentication → Sign In / Providers 에서 Allow anonymous sign-ins 를 켜고 Save changes 를 누르세요';
+  if (/signups? not allowed|signup_disabled/.test(msg)) return 'Allow new users to sign up 을 켜 주세요';
+  if (/invalid api key|no api key|jwt|apikey/.test(msg)) return 'config.js 의 supabaseAnonKey 값을 확인하세요';
+  if (/captcha/.test(msg)) return 'CAPTCHA 가 켜져 있으면 익명 로그인이 막힙니다 (Attack Protection 설정 확인)';
+  if (/rate limit|too many/.test(msg)) return '잠시 후 다시 시도하거나 Authentication → Rate Limits 를 늘리세요';
+  if (/fetch|network|load failed/.test(msg)) return 'config.js 의 supabaseUrl 값을 확인하세요';
+  return 'Supabase 설정과 config.js 값을 확인하세요';
+}
+
 export function createNet(config, handlers) {
   const sb = supabase.createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: 'sixteen.auth' },
@@ -27,7 +39,7 @@ export function createNet(config, handlers) {
     let session = data.session;
     if (!session) {
       const res = await sb.auth.signInAnonymously();
-      if (res.error) throw new Error(`익명 로그인 실패: ${res.error.message} (Supabase에서 Anonymous Sign-ins 를 켜 주세요)`);
+      if (res.error) throw new Error(`익명 로그인 실패: ${res.error.message} (${signInHint(res.error)})`);
       session = res.data.session;
     }
     userId = session.user.id;
