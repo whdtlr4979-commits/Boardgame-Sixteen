@@ -150,16 +150,16 @@ function restartTile(c) {
   const color = COLORS[c];
   // 16 둘레를 반시계 방향으로 도는 화살표 4개 (둥글고 통통한 스타일)
   const loop = `  <g fill="none" stroke="${color}" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M84 44 V26 a12 12 0 0 0 -12 -12 H44"/>
-    <path d="M28 14 H26 a12 12 0 0 0 -12 12 V36"/>
-    <path d="M14 56 V72 a12 12 0 0 0 12 12 H54"/>
-    <path d="M70 84 H72 a12 12 0 0 0 12 -12 V62"/>
+    <path d="M84 41 V26 a12 12 0 0 0 -12 -12 H51"/>
+    <path d="M26 14 a12 12 0 0 0 -12 12 V31"/>
+    <path d="M14 59 V72 a12 12 0 0 0 12 12 H47"/>
+    <path d="M72 84 a12 12 0 0 0 12 -12 V67"/>
   </g>
   <g fill="${color}" stroke="${color}" stroke-width="4.5" stroke-linejoin="round">
-    <path d="M44 5.5 L44 22.5 L32 14 Z"/>
-    <path d="M5.5 36 L22.5 36 L14 48 Z"/>
-    <path d="M54 75.5 L54 92.5 L66 84 Z"/>
-    <path d="M75.5 62 L92.5 62 L84 50 Z"/>
+    <path d="M51 5.5 L51 22.5 L39 14 Z"/>
+    <path d="M5.5 31 L22.5 31 L14 43 Z"/>
+    <path d="M47 75.5 L47 92.5 L59 84 Z"/>
+    <path d="M75.5 67 L92.5 67 L84 55 Z"/>
   </g>`;
   return tile(`${NAMES[c]} 16 RESTART`, [
     loop,
