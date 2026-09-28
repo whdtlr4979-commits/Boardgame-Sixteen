@@ -139,7 +139,7 @@ SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY=<anon key> npm run test:e2
 - **미리보기:** 배포된 사이트의 `/tiles/` 주소(로컬은 `npm run dev` 후 `http://localhost:5173/tiles/`)에서 모든 타일을 파일 이름과 함께 볼 수 있습니다.
 - **수정 방법:** Figma·Illustrator·Inkscape 같은 그림 프로그램으로 열어 고치거나, 메모장으로 열어 색상 코드·글자를 바꿔도 됩니다. **파일 이름은 바꾸지 마세요.**
 - **크기:** 원본은 가로 100 × 세로 104 비율(흰 정사각 타일 + 아래·오른쪽 그림자)입니다. 비율이 다르면 화면에서 늘어나 보일 수 있습니다.
-- **글꼴:** 숫자는 Old Standard TT Bold(6·9 끝이 동그랗게 말리는 글꼴), 글자(START·END·RESTART)는 Arimo Bold를 **윤곽선(path)으로 변환**해 넣었습니다. 그래서 어느 기기에서나 똑같이 보이지만, 그림 프로그램에서는 글자가 아니라 도형으로 보입니다. 두 글꼴 모두 SIL Open Font License입니다.
+- **글꼴:** 숫자와 글자(START·END·RESTART)는 **Baloo 2 ExtraBold**를 **윤곽선(path)으로 변환**해 넣었습니다. 모든 숫자는 한 자리·두 자리 상관없이 같은 크기라 획 두께가 똑같습니다. 어느 기기에서나 똑같이 보이지만, 그림 프로그램에서는 글자가 아니라 도형으로 보입니다. (SIL Open Font License)
 - **PNG로 바꾸려면:** 모든 타일을 같은 이름의 `.png`로 저장하고 `public/app.js`의 `TILE_EXT = 'svg'`를 `'png'`로 바꾸세요.
 - **처음 디자인으로 되돌리기:** `npm run tiles -- --force` (수정한 파일이 덮어써지니 주의). 빠진 파일만 다시 만들려면 `npm run tiles`.
 - 파일 이름 규칙과 파일이 모두 있는지는 `npm test`가 확인합니다.

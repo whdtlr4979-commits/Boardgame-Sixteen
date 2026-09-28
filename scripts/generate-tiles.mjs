@@ -3,8 +3,9 @@
 //   npm run tiles            없는 파일만 새로 만든다 (직접 수정한 파일은 그대로 둠)
 //   npm run tiles -- --force 모든 파일을 이 스크립트의 디자인으로 다시 만든다 (수정한 내용이 덮어써짐!)
 //
-// 숫자(Old Standard TT Bold — 6·9 끝이 동그랗게 말리는 글꼴)와 글자(Arimo)는 글꼴 파일에서 윤곽선(path)으로 변환해 넣으므로
-// 어느 기기에서나 똑같이 보인다. 글꼴: SIL Open Font License (@fontsource 패키지).
+// 숫자와 글자는 Baloo 2 ExtraBold 글꼴 파일에서 윤곽선(path)으로 변환해 넣으므로
+// 어느 기기에서나 똑같이 보인다. 글꼴: SIL Open Font License (@fontsource/baloo-2).
+// 모든 숫자(한 자리·두 자리)는 같은 글자 크기를 써서 획 두께가 똑같다.
 //
 // 파일 이름 규칙 (게임이 이 이름으로 불러온다)
 //   {색}-{숫자}.svg   숫자 타일 1~15      예) red-7.svg
@@ -34,8 +35,7 @@ const loadFont = async (pkg, file) => {
   const buf = await readFile(new URL(`../node_modules/@fontsource/${pkg}/files/${file}`, import.meta.url));
   return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 };
-const SERIF = await loadFont('old-standard-tt', 'old-standard-tt-latin-700-normal.woff');
-const SANS = await loadFont('arimo', 'arimo-latin-700-normal.woff');
+const FONT = await loadFont('baloo-2', 'baloo-2-latin-800-normal.woff');
 
 // 타일 크기: 가로 100, 세로 104 (흰 정사각 윗면 + 아래·오른쪽 그림자)
 const W = 100;
@@ -68,14 +68,11 @@ function bbox(commands) {
  * 글자를 윤곽선 path 로 변환한다.
  * height: 숫자(또는 대문자) 높이, cx: 가운데 x, cy: 글자 세로 가운데, maxW: 최대 너비
  */
-// 두 자리 숫자는 글꼴 기본 간격이 넓어서 조금 좁힌다
-const TIGHT = -0.09;
-
-function textPath(font, text, { height, cx, cy, maxW = 90, spacing = 0, ref = '8' }) {
+function textPath(font, text, { height, size: fixedSize, cx, cy, maxW = 90, spacing = 0, ref = '8' }) {
   const probe = bbox(glyphRun(font, ref, 0, 0, 100));
-  let size = (100 * height) / (probe.y2 - probe.y1);
+  let size = fixedSize ?? (100 * height) / (probe.y2 - probe.y1);
   let box = bbox(glyphRun(font, text, 0, 0, size, spacing));
-  if (box.x2 - box.x1 > maxW) {
+  if (!fixedSize && box.x2 - box.x1 > maxW) {
     size *= maxW / (box.x2 - box.x1);
     box = bbox(glyphRun(font, text, 0, 0, size, spacing));
   }
@@ -84,6 +81,21 @@ function textPath(font, text, { height, cx, cy, maxW = 90, spacing = 0, ref = '8
   const x = cx - (box.x1 + box.x2) / 2;
   return pathData(glyphRun(font, text, x, baseline, size, spacing));
 }
+
+// 모든 숫자 타일에 쓰는 하나의 글자 크기: 숫자 높이 50, 가장 넓은 두 자리 숫자도 너비 76 안에 들어가게
+const NUM_HEIGHT = 50;
+const NUM_MAX_W = 76;
+const NUM_SIZE = (() => {
+  const probe = bbox(glyphRun(FONT, '8', 0, 0, 100));
+  let size = (100 * NUM_HEIGHT) / (probe.y2 - probe.y1);
+  for (let n = 10; n <= 16; n++) {
+    const b = bbox(glyphRun(FONT, String(n), 0, 0, size));
+    if (b.x2 - b.x1 > NUM_MAX_W) size *= NUM_MAX_W / (b.x2 - b.x1);
+  }
+  return size;
+})();
+const numPath = (text, cy) => textPath(FONT, text, { size: NUM_SIZE, cx: 49, cy });
+const labelPath = (text, cy, height = 11, maxW = 60) => textPath(FONT, text, { height, cx: 49, cy, maxW, ref: text[0] });
 
 // opentype.js 의 toPathData 는 8.000000000000009 같은 값을 NaN 으로 출력하는 버그가 있어 직접 만든다.
 function pathData(commands) {
@@ -112,31 +124,26 @@ ${inner}
 }
 
 const pathEl = (d, fill) => `  <path d="${d}" fill="${fill}"/>`;
-// 라벨(START/END/RESTART)은 실물처럼 굵게 보이도록 같은 색 테두리를 살짝 두른다
-const labelEl = (d, fill, w = 0.9) => `  <path d="${d}" fill="${fill}" stroke="${fill}" stroke-width="${w}" stroke-linejoin="round"/>`;
 
 function numberTile(c, n) {
   const color = COLORS[c];
   const parts = [];
   if (n === 1) {
-    parts.push(pathEl(textPath(SERIF, '1', { height: 52, cx: 49, cy: 38 }), color));
-    parts.push(labelEl(textPath(SANS, 'START', { height: 10, cx: 49, cy: 77, maxW: 56, ref: 'S' }), color));
+    parts.push(pathEl(numPath('1', 40), color));
+    parts.push(pathEl(labelPath('START', 79), color));
   } else if (n === 6 || n === 9) {
     // 6과 9를 구분하는 점
-    parts.push(pathEl(textPath(SERIF, String(n), { height: 56, cx: 49, cy: 44 }), color));
-    parts.push(`  <circle cx="49" cy="83" r="4.2" fill="${color}"/>`);
+    parts.push(pathEl(numPath(String(n), 44), color));
+    parts.push(`  <circle cx="49" cy="83" r="4.6" fill="${color}"/>`);
   } else {
-    parts.push(pathEl(textPath(SERIF, String(n), { height: 60, cx: 49, cy: 48, maxW: 82, spacing: n >= 10 ? TIGHT : 0 }), color));
+    parts.push(pathEl(numPath(String(n), 49), color));
   }
   return tile(`${NAMES[c]} ${n}`, parts.join('\n'));
 }
 
 function endTile(c) {
   const color = COLORS[c];
-  return tile(`${NAMES[c]} 16 END`, [
-    pathEl(textPath(SERIF, '16', { height: 52, cx: 49, cy: 40, maxW: 82, spacing: TIGHT }), color),
-    labelEl(textPath(SANS, 'END', { height: 10, cx: 49, cy: 78, maxW: 60, ref: 'E' }), color),
-  ].join('\n'));
+  return tile(`${NAMES[c]} 16 END`, [pathEl(numPath('16', 40), color), pathEl(labelPath('END', 79), color)].join('\n'));
 }
 
 function restartTile(c) {
@@ -156,8 +163,9 @@ function restartTile(c) {
   </g>`;
   return tile(`${NAMES[c]} 16 RESTART`, [
     loop,
-    pathEl(textPath(SERIF, '16', { height: 38, cx: 49, cy: 42, maxW: 52, spacing: TIGHT }), color),
-    labelEl(textPath(SANS, 'RESTART', { height: 8, cx: 49, cy: 70, maxW: 58, ref: 'R' }), color, 0.7),
+    // 화살표 안쪽 공간이 좁아 RESTART 타일의 16만 조금 작다
+    pathEl(textPath(FONT, '16', { height: 34, cx: 49, cy: 42, maxW: 50 }), color),
+    pathEl(labelPath('RESTART', 69, 8, 56), color),
   ].join('\n'));
 }
 
@@ -200,7 +208,7 @@ function backTile() {
       <stop offset="0.6" stop-color="#d62976"/>
       <stop offset="1" stop-color="#4f5bd5"/>
     </linearGradient>`;
-  return tile('가려진 타일', pathEl(textPath(SERIF, '16', { height: 40, cx: 49, cy: 49, maxW: 70, spacing: TIGHT }), 'rgba(255,255,255,0.92)'),
+  return tile('가려진 타일', pathEl(textPath(FONT, '16', { height: 40, cx: 49, cy: 49, maxW: 70 }), 'rgba(255,255,255,0.92)'),
     { face: 'url(#back)', stroke: 'none', defs });
 }
 
