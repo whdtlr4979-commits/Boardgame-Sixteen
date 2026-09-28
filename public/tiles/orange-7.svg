@@ -1,21 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" width="100" height="108">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="100" height="104">
   <title>주황 7</title>
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#faf9f5"/>
-      <stop offset="1" stop-color="#ebe6db"/>
-    </linearGradient>
-    <linearGradient id="back" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#feda75"/>
-      <stop offset="0.3" stop-color="#fa7e1e"/>
-      <stop offset="0.6" stop-color="#d62976"/>
-      <stop offset="1" stop-color="#4f5bd5"/>
-    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="130%" height="130%"><feGaussianBlur stdDeviation="1.6"/></filter>
   </defs>
-  <!-- 타일 옆면 -->
-  <rect x="1" y="8" width="98" height="99" rx="17" fill="#d3ccbb"/>
+  <!-- 그림자 -->
+  <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
-  <rect x="1" y="1" width="98" height="99" rx="17" fill="url(#face)" stroke="#e0dacd" stroke-width="1.5"/>
-  <text x="50" y="70" text-anchor="middle" font-family="Georgia, 'Noto Serif', 'Times New Roman', serif" font-weight="700" font-size="60" letter-spacing="-3" fill="#ef7d12">7</text>
+  <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
+  <path d="M36.09 26.72L36.09 26.72L63.15 26.72Q64.47 27.58 65.52 29.09Q66.57 30.61 66.57 32.86L66.57 32.86Q66.57 34.11 66.34 35.39Q66.11 36.67 65.56 37.92L65.56 37.92L49.39 74.54Q48.3 74.62 47.37 74.62L47.37 74.62L45.5 74.62Q42 74.62 39.82 73.26Q37.65 71.9 37.65 68.71L37.65 68.71Q37.65 67.08 38.46 65.17Q39.28 63.27 40.52 60.63L40.52 60.63L51.88 37.37L32.83 37.37Q32.36 36.52 31.89 35.12Q31.43 33.72 31.43 32.16L31.43 32.16Q31.43 29.21 32.75 27.97Q34.07 26.72 36.09 26.72" fill="#f18a00"/>
 </svg>

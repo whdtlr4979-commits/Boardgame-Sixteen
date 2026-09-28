@@ -1,21 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" width="100" height="108">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="100" height="104">
   <title>초록 14</title>
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#faf9f5"/>
-      <stop offset="1" stop-color="#ebe6db"/>
-    </linearGradient>
-    <linearGradient id="back" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#feda75"/>
-      <stop offset="0.3" stop-color="#fa7e1e"/>
-      <stop offset="0.6" stop-color="#d62976"/>
-      <stop offset="1" stop-color="#4f5bd5"/>
-    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="130%" height="130%"><feGaussianBlur stdDeviation="1.6"/></filter>
   </defs>
-  <!-- 타일 옆면 -->
-  <rect x="1" y="8" width="98" height="99" rx="17" fill="#d3ccbb"/>
+  <!-- 그림자 -->
+  <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
-  <rect x="1" y="1" width="98" height="99" rx="17" fill="url(#face)" stroke="#e0dacd" stroke-width="1.5"/>
-  <text x="50" y="70" text-anchor="middle" font-family="Georgia, 'Noto Serif', 'Times New Roman', serif" font-weight="700" font-size="54" letter-spacing="-3" fill="#15935a">14</text>
+  <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
+  <path d="M22.56 68.4L22.56 53.47L22.56 39.32L14.79 41.73Q13.62 40.95 12.45 39.55Q11.29 38.15 11.29 35.66L11.29 35.66Q11.29 31 16.96 29.13L16.96 29.13L25.67 26.18L28.55 26.18Q31.89 26.18 33.84 28.12Q35.78 30.07 35.78 33.41L35.78 33.41L35.78 73.92Q34.93 74.16 33.33 74.39Q31.74 74.62 29.87 74.62L29.87 74.62Q26.06 74.62 24.31 73.3Q22.56 71.98 22.56 68.4L22.56 68.4M45.19 51.14L45.19 51.14L63 27.27Q64.47 26.8 66.42 26.49Q68.36 26.18 69.84 26.18L69.84 26.18Q72.25 26.18 74.35 26.8Q76.45 27.42 77.81 28.98Q79.17 30.53 79.17 33.41L79.17 33.41L79.17 54.09L85.31 54.09Q85.78 54.87 86.25 56.31Q86.71 57.75 86.71 59.3L86.71 59.3Q86.71 62.18 85.39 63.46Q84.07 64.75 82.05 64.75L82.05 64.75L79.17 64.75L79.17 73.92Q78.39 74.08 76.64 74.35Q74.89 74.62 73.34 74.62L73.34 74.62Q70 74.62 68.13 73.73Q66.26 72.83 66.26 69.1L66.26 69.1L66.26 64.75L47.83 64.75Q46.05 63.81 44.76 61.99Q43.48 60.16 43.48 57.51L43.48 57.51Q43.48 56.04 43.83 54.21Q44.18 52.38 45.19 51.14M57.09 54.09L66.96 54.09L66.96 39.47L66.73 39.47L57.09 54.09" fill="#12924a"/>
 </svg>

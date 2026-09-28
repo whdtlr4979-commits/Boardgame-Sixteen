@@ -218,14 +218,14 @@ main { margin-left: var(--sidebar); min-height: 100vh; }
 /* ---------- 타일 (그림은 public/tiles/*.svg) ---------- */
 .tile {
   --w: 46px;
-  width: var(--w); height: calc(var(--w) * 1.08); flex: none;
-  border-radius: calc(var(--w) * .17);
+  width: var(--w); height: calc(var(--w) * 1.04); flex: none;
+  border-radius: calc(var(--w) * .16);
   position: relative; user-select: none;
   transition: transform .15s cubic-bezier(.2,.8,.3,1.2), box-shadow .15s;
 }
 .tile img {
   width: 100%; height: 100%; display: block; pointer-events: none;
-  filter: drop-shadow(0 calc(var(--w) * .05) calc(var(--w) * .09) rgba(0,0,0,.22));
+  filter: drop-shadow(0 calc(var(--w) * .02) calc(var(--w) * .04) rgba(0,0,0,.12));
 }
 .tile.sm { --w: 30px; }
 .tile.md { --w: 40px; }
