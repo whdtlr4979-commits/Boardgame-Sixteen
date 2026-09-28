@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "sync": "node scripts/sync-engine.mjs",
+    "tiles": "node scripts/generate-tiles.mjs",
     "test": "node --test test/*.test.js",
     "test:e2e": "node --test --test-force-exit test/e2e-supabase.mjs"
   },

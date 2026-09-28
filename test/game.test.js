@@ -241,3 +241,12 @@ test('public/game.js 는 엔진 원본과 동일하다 (npm run sync)', async ()
   const pub = await readFile(new URL('../public/game.js', import.meta.url), 'utf8');
   assert.equal(pub, src, 'npm run sync 를 실행하세요');
 });
+
+test('모든 타일에 이미지 파일이 있다 (public/tiles)', async () => {
+  const { existsSync } = await import('node:fs');
+  const name = (t) => (t.k === 'scissors' || t.k === 'trash' ? t.k : t.k === 'num' ? `${t.c}-${t.n}` : `${t.c}-${t.k}`);
+  const files = new Set(createDeck().map((t) => `${name(t)}.svg`));
+  files.add('back.svg');
+  assert.equal(files.size, 88, '숫자 75 + RESTART 5 + END 5 + 가위 + 쓰레기통 + 뒷면');
+  for (const f of files) assert.ok(existsSync(new URL(`../public/tiles/${f}`, import.meta.url)), `public/tiles/${f} 없음 (npm run tiles)`);
+});

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sixteen 타일 미리보기</title>
+  <style>
+    :root { --bg: #f4f1fa; --text: #262626; --muted: #777; --card: #fff; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #121016; --text: #eee; --muted: #999; --card: #1d1a22; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif; }
+    h1 { font-size: 22px; margin: 0 0 6px; }
+    p { color: var(--muted); margin: 0 0 20px; line-height: 1.6; }
+    code { background: var(--card); padding: 1px 6px; border-radius: 6px; }
+    h2 { font-size: 15px; margin: 26px 0 10px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 12px; }
+    figure { margin: 0; background: var(--card); border-radius: 12px; padding: 10px 8px 8px; text-align: center; }
+    figure img { width: 64px; height: auto; display: block; margin: 0 auto 6px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.2)); }
+    figcaption { font-size: 11px; color: var(--muted); word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>Sixteen 타일 미리보기</h1>
+  <p>이 폴더(<code>public/tiles/</code>)의 SVG 파일을 수정하면 게임에 그대로 반영됩니다. 파일 이름은 바꾸지 마세요.<br>
+    새로고침해도 예전 그림이 보이면 브라우저 캐시를 비우거나 강력 새로고침(Ctrl+Shift+R)을 해 주세요.</p>
+  <div id="app"></div>
+  <script>
+    const colors = { red: '빨강', orange: '주황', green: '초록', blue: '파랑', black: '검정' };
+    const card = (file) => `<figure><img src="${file}" alt="${file}"><figcaption>${file}</figcaption></figure>`;
+    let html = '';
+    for (const [c, name] of Object.entries(colors)) {
+      const files = Array.from({ length: 15 }, (_, i) => `${c}-${i + 1}.svg`).concat(`${c}-restart.svg`, `${c}-end.svg`);
+      html += `<h2>${name} (${c})</h2><div class="grid">${files.map(card).join('')}</div>`;
+    }
+    html += `<h2>기능 타일 · 뒷면</h2><div class="grid">${['scissors.svg', 'trash.svg', 'back.svg'].map(card).join('')}</div>`;
+    document.getElementById('app').innerHTML = html;
+  </script>
+</body>
+</html>
