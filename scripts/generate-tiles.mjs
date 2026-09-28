@@ -3,7 +3,7 @@
 //   npm run tiles            없는 파일만 새로 만든다 (직접 수정한 파일은 그대로 둠)
 //   npm run tiles -- --force 모든 파일을 이 스크립트의 디자인으로 다시 만든다 (수정한 내용이 덮어써짐!)
 //
-// 숫자(Libre Bodoni)와 글자(Arimo)는 글꼴 파일에서 윤곽선(path)으로 변환해 넣으므로
+// 숫자(DM Serif Display)와 글자(Arimo)는 글꼴 파일에서 윤곽선(path)으로 변환해 넣으므로
 // 어느 기기에서나 똑같이 보인다. 글꼴: SIL Open Font License (@fontsource 패키지).
 //
 // 파일 이름 규칙 (게임이 이 이름으로 불러온다)
@@ -34,30 +34,52 @@ const loadFont = async (pkg, file) => {
   const buf = await readFile(new URL(`../node_modules/@fontsource/${pkg}/files/${file}`, import.meta.url));
   return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 };
-const SERIF = await loadFont('libre-bodoni', 'libre-bodoni-latin-700-normal.woff');
+const SERIF = await loadFont('dm-serif-display', 'dm-serif-display-latin-400-normal.woff');
 const SANS = await loadFont('arimo', 'arimo-latin-700-normal.woff');
 
 // 타일 크기: 가로 100, 세로 104 (흰 정사각 윗면 + 아래·오른쪽 그림자)
 const W = 100;
 const H = 104;
 
+/** 글자를 한 글자씩 배치한 path (opentype.js 의 텍스트 셰이핑은 일부 글꼴에서 오류가 나서 쓰지 않는다) */
+function glyphRun(font, text, x, y, size, spacing = 0) {
+  const scale = size / font.unitsPerEm;
+  const commands = [];
+  let pen = x;
+  for (const ch of text) {
+    const g = font.charToGlyph(ch);
+    commands.push(...g.getPath(pen, y, size).commands);
+    pen += g.advanceWidth * scale + spacing * size;
+  }
+  return commands;
+}
+
+function bbox(commands) {
+  const xs = [];
+  const ys = [];
+  for (const c of commands) {
+    for (const k of ['x', 'x1', 'x2']) if (c[k] !== undefined) xs.push(c[k]);
+    for (const k of ['y', 'y1', 'y2']) if (c[k] !== undefined) ys.push(c[k]);
+  }
+  return { x1: Math.min(...xs), x2: Math.max(...xs), y1: Math.min(...ys), y2: Math.max(...ys) };
+}
+
 /**
  * 글자를 윤곽선 path 로 변환한다.
  * height: 숫자(또는 대문자) 높이, cx: 가운데 x, cy: 글자 세로 가운데, maxW: 최대 너비
  */
 function textPath(font, text, { height, cx, cy, maxW = 90, spacing = 0, ref = '8' }) {
-  const probe = font.getPath(ref, 0, 0, 100).getBoundingBox();
+  const probe = bbox(glyphRun(font, ref, 0, 0, 100));
   let size = (100 * height) / (probe.y2 - probe.y1);
-  const measure = (s) => font.getPath(text, 0, 0, s, { letterSpacing: spacing }).getBoundingBox();
-  let box = measure(size);
+  let box = bbox(glyphRun(font, text, 0, 0, size, spacing));
   if (box.x2 - box.x1 > maxW) {
     size *= maxW / (box.x2 - box.x1);
-    box = measure(size);
+    box = bbox(glyphRun(font, text, 0, 0, size, spacing));
   }
   const capH = (probe.y2 - probe.y1) * (size / 100);
   const baseline = cy + capH / 2;
   const x = cx - (box.x1 + box.x2) / 2;
-  return pathData(font.getPath(text, x, baseline, size, { letterSpacing: spacing }).commands);
+  return pathData(glyphRun(font, text, x, baseline, size, spacing));
 }
 
 // opentype.js 의 toPathData 는 8.000000000000009 같은 값을 NaN 으로 출력하는 버그가 있어 직접 만든다.
