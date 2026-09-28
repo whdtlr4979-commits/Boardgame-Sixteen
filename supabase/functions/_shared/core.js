@@ -340,9 +340,13 @@ export function createCore(db, opts = {}) {
       return { code: room.code, runBots: true };
     },
 
-    async play(userId, { tileIds, row }) {
-      const { code, result } = await gameAction(userId, (game, me) =>
-        game.play(me.id, (Array.isArray(tileIds) ? tileIds : []).map(Number), row ? String(row) : undefined));
+    async play(userId, { tileIds, row, count }) {
+      const { code, result } = await gameAction(userId, (game, me) => game.play(
+        me.id,
+        (Array.isArray(tileIds) ? tileIds : []).map(Number),
+        row ? String(row) : undefined,
+        count == null ? undefined : Number(count),
+      ));
       return { code, runBots: true, finished: result.finished };
     },
 
@@ -408,7 +412,7 @@ export function createCore(db, opts = {}) {
       if (!room) return;
       const id = game.players[game.current].id;
       const move = botMove(game, id);
-      if (move.action === 'play') game.play(id, move.tileIds, move.row);
+      if (move.action === 'play') game.play(id, move.tileIds, move.row, move.count);
       else game.pass(id);
       game.lastMoveAt = now();
       const status = game.phase === 'finished' ? 'finished' : 'playing';

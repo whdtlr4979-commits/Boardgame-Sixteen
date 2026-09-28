@@ -15,11 +15,11 @@
   --shadow: 0 4px 24px rgba(0, 0, 0, .08);
   --felt: radial-gradient(ellipse at center, #f7f3ff 0%, #f1f4fb 60%, #eceff6 100%);
   --ig: linear-gradient(45deg, #feda75 0%, #fa7e1e 25%, #d62976 50%, #962fbf 75%, #4f5bd5 100%);
-  --t-red: #ef4444;
-  --t-yellow: #f59e0b;
-  --t-green: #16a34a;
-  --t-blue: #2563eb;
-  --t-purple: #9333ea;
+  --t-red: #d7263d;
+  --t-orange: #ef7d12;
+  --t-green: #15935a;
+  --t-blue: #2466d1;
+  --t-black: #262626;
   --tile-bg: #fffdf7;
   --tile-edge: #e8e1cf;
   --radius: 12px;
@@ -211,46 +211,43 @@ main { margin-left: var(--sidebar); min-height: 100vh; }
 .mini-rules { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .mini-rules li { display: flex; align-items: center; gap: 10px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.dot.red { background: var(--t-red); } .dot.yellow { background: var(--t-yellow); }
-.dot.green { background: var(--t-green); } .dot.blue { background: var(--t-blue); } .dot.purple { background: var(--t-purple); }
+.dot.red { background: var(--t-red); } .dot.orange { background: var(--t-orange); }
+.dot.green { background: var(--t-green); } .dot.blue { background: var(--t-blue); } .dot.black { background: var(--t-black); box-shadow: 0 0 0 1px var(--muted); }
 .side-foot { color: var(--muted); font-size: 12px; margin-top: 24px; padding: 0 4px; opacity: .8; }
 
-/* ---------- 타일 ---------- */
+/* ---------- 타일 (공식 식스틴 타일 디자인: 흰 정사각 타일 + 세리프 숫자) ---------- */
 .tile {
   --w: 46px;
-  width: var(--w); height: calc(var(--w) * 1.36); flex: none;
-  border-radius: calc(var(--w) * .18);
-  background: linear-gradient(180deg, var(--tile-bg) 0%, var(--tile-bg) 82%, var(--tile-edge) 100%);
-  border: 1px solid var(--tile-edge);
-  box-shadow: 0 2px 0 var(--tile-edge), 0 3px 8px rgba(0,0,0,.12);
+  --c: var(--t-black);
+  width: var(--w); height: calc(var(--w) * 1.08); flex: none;
+  border-radius: calc(var(--w) * .17);
+  background: linear-gradient(155deg, #ffffff 0%, #faf9f5 55%, #ece8de 100%);
+  border: 1px solid #e2ddd0;
+  box-shadow: 0 calc(var(--w) * .07) 0 #d6cfbf, 0 calc(var(--w) * .1) calc(var(--w) * .22) rgba(0,0,0,.2), inset 0 1px 0 #fff;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  position: relative; user-select: none; color: var(--c, #333);
-  font-weight: 800; font-size: calc(var(--w) * .46); font-variant-numeric: tabular-nums;
+  position: relative; user-select: none; color: var(--c);
+  font-family: "Noto Serif", Georgia, "Times New Roman", serif; font-weight: 700;
   transition: transform .15s cubic-bezier(.2,.8,.3,1.2), box-shadow .15s;
 }
-.tile::after {
-  content: ""; position: absolute; bottom: 14%; left: 50%; width: 40%; height: 3px; border-radius: 2px;
-  background: var(--c); transform: translateX(-50%); opacity: .85;
+.tile .num { font-size: calc(var(--w) * .58); line-height: .95; letter-spacing: -.05em; font-variant-numeric: lining-nums; }
+.tile .sub {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", Arial, sans-serif;
+  font-size: calc(var(--w) * .13); font-weight: 900; letter-spacing: .02em; line-height: 1; margin-top: calc(var(--w) * .03);
 }
-.tile.red { --c: var(--t-red); } .tile.yellow { --c: var(--t-yellow); }
-.tile.green { --c: var(--t-green); } .tile.blue { --c: var(--t-blue); } .tile.purple { --c: var(--t-purple); }
-/* 특수 타일 */
-.tile small { font-size: calc(var(--w) * .2); line-height: 1; opacity: .75; font-weight: 800; margin-bottom: 1px; }
-.tile b { line-height: 1; font-weight: 900; }
-.tile.k-restart b { font-size: calc(var(--w) * .58); }
-.tile.k-end b { font-size: calc(var(--w) * .27); letter-spacing: -.03em; }
-.tile.k-restart, .tile.k-end { padding-bottom: calc(var(--w) * .12); }
-.tile.k-end::after, .tile.k-restart::after { height: 4px; width: 60%; }
-.tile.none { --c: #d62976; font-size: calc(var(--w) * .5); }
-.tile.none::after { background: var(--ig); }
-.tile.inline { display: inline-flex; vertical-align: middle; margin-right: 4px; }
+.tile.red { --c: var(--t-red); } .tile.orange { --c: var(--t-orange); }
+.tile.green { --c: var(--t-green); } .tile.blue { --c: var(--t-blue); } .tile.black { --c: var(--t-black); }
+.tile.k-restart .num { font-size: calc(var(--w) * .42); }
+.tile.k-restart .sub { font-size: calc(var(--w) * .09); }
+.tile .loop { position: absolute; left: 12%; top: 10%; width: 76%; height: 80%; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.tile .loop .head { fill: currentColor; stroke: none; }
+.tile .icon { width: 64%; height: 64%; fill: none; stroke: #1f1f1f; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tile.sm { --w: 30px; }
 .tile.md { --w: 40px; }
 .tile.lg { --w: 58px; }
+.tile.inline { display: inline-flex; vertical-align: middle; margin-right: 4px; }
 .tile.back {
   background: var(--ig); border-color: transparent; box-shadow: 0 2px 0 rgba(0,0,0,.15);
 }
-.tile.back::after { display: none; }
 
 /* ---------- 게임방 ---------- */
 .view-room { display: flex; gap: 20px; padding: 20px; max-width: 1280px; margin: 0 auto; height: 100vh; }
@@ -324,8 +321,8 @@ select, .input {
 .row.just .row-tiles .tile:last-child { animation: drop .35s cubic-bezier(.2,.8,.3,1.2) both; }
 .row.closed { opacity: .6; }
 .row-label { width: 38px; flex: none; font-weight: 800; font-size: 12px; color: var(--c); }
-.row-label.red { --c: var(--t-red); } .row-label.yellow { --c: var(--t-yellow); } .row-label.green { --c: var(--t-green); }
-.row-label.blue { --c: var(--t-blue); } .row-label.purple { --c: var(--t-purple); }
+.row-label.red { --c: var(--t-red); } .row-label.orange { --c: var(--t-orange); } .row-label.green { --c: var(--t-green); }
+.row-label.blue { --c: var(--t-blue); } .row-label.black { --c: var(--text); }
 .row-tiles { flex: 1; display: flex; gap: 4px; overflow-x: auto; padding: 3px 2px 5px; scrollbar-width: none; }
 .row-tiles::-webkit-scrollbar { display: none; }
 .row-tiles .tile { --w: 34px; }
@@ -350,6 +347,10 @@ select, .input {
 .hand .tile { cursor: pointer; }
 .hand .tile:hover { transform: translateY(-5px); }
 .hand .tile.sel { transform: translateY(-14px); box-shadow: 0 0 0 3px var(--link), 0 10px 18px rgba(0,149,246,.35); }
+.trash-pick { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 14px 0 4px; }
+.trash-pick .tile.gone { opacity: .35; transform: translateY(-4px) rotate(-6deg); box-shadow: 0 0 0 2px var(--danger); }
+.count-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.count-btns .btn { min-width: 44px; }
 .hand .tile.new { animation: glow 1.6s ease-out 2; }
 @keyframes glow { 0% { box-shadow: 0 0 0 0 rgba(214,41,118,.7); } 100% { box-shadow: 0 0 0 12px rgba(214,41,118,0); } }
 .hand-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }

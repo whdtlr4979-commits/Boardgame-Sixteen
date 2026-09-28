@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
-  createDeck, validatePlay, legalMoves, hasLegalMove, rowTop, sortHand, SixteenGame, botMove, HAND_SIZE, COLORS,
+  tilePenalty, createDeck, validatePlay, legalMoves, hasLegalMove, rowTop, sortHand, SixteenGame, botMove, HAND_SIZE, COLORS,
 } from '../supabase/functions/_shared/game.js';
 
 let nextId = 1000;
@@ -31,21 +31,39 @@ test('구성물: 5색 × (1~15 + RESTART + END) + 가위 2 + 쓰레기통 1 = 88
   assert.equal(d.filter((t) => t.k === 'trash').length, 1);
 });
 
-test('준비: 인원별 배분(2인 30, 3인 29, 4인 22) 후 1 타일 5개로 줄 시작', () => {
-  for (const n of [2, 3, 4]) {
-    const players = Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
-    const g = new SixteenGame(players, { rng: seeded(n) });
-    assert.equal(g.rows.length, 5);
-    for (const row of g.rows) {
-      assert.equal(row.tiles.length, 1);
-      assert.equal(row.tiles[0].n, 1);
-      assert.equal(row.tiles[0].c, row.color);
+test('준비: 2인은 1을 먼저 꺼내고 30개씩, 3~4인은 1까지 나눠 각자 낸 뒤 빨강 1 주인부터', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    for (const n of [2, 3, 4]) {
+      const players = Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
+      const g = new SixteenGame(players, { rng: seeded(seed * 7 + n) });
+      const held = g.players.reduce((s, p) => s + p.hand.length, 0);
+      const onTable = g.rows.reduce((s, r) => s + r.tiles.length, 0);
+      assert.equal(held + onTable + g.unused.length, 88, '모든 타일이 어딘가에 있어야 함');
+      assert.ok(g.players.every((p) => p.hand.every((t) => !(t.k === 'num' && t.n === 1))), '손에 1이 남으면 안 됨');
+      for (const row of g.rows) {
+        if (row.tiles.length) assert.deepEqual([row.tiles[0].n, row.tiles[0].c], [1, row.color]);
+      }
+      if (n === 2) {
+        assert.ok(g.players.every((p) => p.hand.length === 30), '2인은 1을 빼고 30개씩');
+        assert.ok(g.rows.every((r) => r.tiles.length === 1));
+      }
+      if (n === 4) {
+        assert.equal(g.unused.length, 0, '4인은 88개 모두 배분');
+        assert.ok(g.rows.every((r) => r.tiles.length === 1));
+        assert.equal(held + 5, 88);
+      }
+      if (n === 3) {
+        assert.equal(g.unused.length, 1, '3인은 1개가 상자에 남음');
+        const missing = g.rows.filter((r) => !r.tiles.length).length;
+        assert.equal(missing, g.unused[0].k === 'num' && g.unused[0].n === 1 ? 1 : 0);
+      }
+      if (n > 2 && g.rows[0].tiles.length) {
+        // 빨강 1을 가지고 있던 사람이 시작 — 그 사람은 1을 내서 손패가 줄어들었다
+        const dealt = 88 - g.unused.length;
+        assert.equal(dealt / n, n === 3 ? 29 : 22);
+        assert.match(g.log.map((l) => l.text).join('\n'), new RegExp(`빨강 1을 낸 ${g.players[g.current].name}님부터`));
+      }
     }
-    const held = g.players.reduce((s, p) => s + p.hand.length, 0);
-    const onesInHands = HAND_SIZE[n] * n - held;
-    assert.ok(onesInHands >= 0 && onesInHands <= 5);
-    assert.ok(g.players.every((p) => p.hand.every((t) => !(t.k === 'num' && t.n === 1))), '손에 1이 남으면 안 됨');
-    assert.equal(held + g.unused.length + 5, 88, '모든 타일이 어딘가에 있어야 함');
   }
   assert.throws(() => new SixteenGame([{ id: 'a', name: 'A' }]), /2~4명/);
   assert.throws(() => new SixteenGame(Array.from({ length: 5 }, (_, i) => ({ id: `${i}`, name: `${i}` }))), /2~4명/);
@@ -63,18 +81,21 @@ test('놓기: 같은 색 줄에 더 큰 숫자, 건너뛰기 가능, 여러 개�
   assert.equal(validatePlay(rows, [N('red', 14), N('red', 15), E('red')]).ok, true, '15 다음 16(END) 연속');
 });
 
-test('RESTART는 줄을 0으로 되돌리고, END는 줄을 닫는다', () => {
+test('RESTART는 줄을 1로 되돌리고, END는 줄을 닫는다', () => {
   const restarted = { color: 'red', tiles: [N('red', 1), N('red', 9), R('red')] };
-  assert.equal(rowTop(restarted), 0);
+  assert.equal(rowTop(restarted), 1);
   const rows = rowsOf();
   rows[0] = restarted;
   assert.equal(validatePlay(rows, [N('red', 2)]).ok, true, 'RESTART 뒤에는 작은 숫자도 가능');
 
   const ended = rowsOf({ blue: [N('blue', 3), E('blue')] });
   assert.match(validatePlay(ended, [N('blue', 9)]).error, /닫혔/);
+  assert.match(validatePlay(ended, [R('blue')]).error, /닫혔/, 'END 뒤에는 RESTART 불가');
+  assert.equal(validatePlay(rowsOf({ red: [R('red')] }), [E('red')]).ok, true, 'RESTART 뒤에 END 가능');
+  assert.equal(validatePlay(rowsOf(), [N('red', 15), R('red'), E('red')]).ok, false, 'RESTART·END 동시 불가');
 });
 
-test('가위는 마지막 타일 제거, 쓰레기통은 1만 남기고 비움 (게임 진행)', () => {
+test('가위·쓰레기통: 제거 후 같은 사람이 숫자 타일을 한 번 더 놓는다', () => {
   const g = new SixteenGame([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], { rng: seeded(5) });
   g.current = 0;
   const [a] = g.players;
@@ -82,18 +103,50 @@ test('가위는 마지막 타일 제거, 쓰레기통은 1만 남기고 비움 (
   red.tiles.push(N('red', 5), N('red', 8), E('red'));
   const scissors = S();
   const trash = T();
-  a.hand.push(scissors, trash);
+  const red9 = N('red', 9);
+  a.hand = [scissors, trash, red9, N('blue', 15), N('green', 15)];
+  g.rows.find((r) => r.color === 'blue').tiles.push(E('blue'));
+  g.rows.find((r) => r.color === 'green').tiles.push(E('green'));
 
   assert.throws(() => g.play('a', [scissors.id]), /줄을 고르세요/);
-  assert.throws(() => g.play('a', [scissors.id], 'blue'), /1만 있는 줄/);
+  assert.throws(() => g.play('a', [scissors.id], 'orange'), /1 타일만 있는 줄/);
   g.play('a', [scissors.id], 'red');
   assert.deepEqual(red.tiles.map((t) => t.n), [1, 5, 8], 'END 가 잘려 줄이 다시 열림');
-  assert.equal(g.discard.length, 2);
+  assert.equal(g.current, 0, '같은 사람 차례가 이어짐');
+  assert.equal(g.bonus, true);
+  assert.throws(() => g.play('a', [trash.id], 'red'), /숫자 타일만/, '추가 차례에는 숫자 타일만');
+  g.play('a', [red9.id]);
+  assert.equal(g.current, 1);
+  assert.equal(g.bonus, false);
 
+  // 쓰레기통: 원하는 개수만큼 (1 제외)
   g.current = 0;
-  g.play('a', [trash.id], 'red');
-  assert.deepEqual(red.tiles.map((t) => t.n), [1]);
-  assert.equal(rowTop(red), 1);
+  assert.deepEqual(red.tiles.map((t) => t.n), [1, 5, 8, 9]);
+  assert.throws(() => g.play('a', [trash.id], 'red', 4), /1~3개/);
+  g.play('a', [trash.id], 'red', 2);
+  assert.deepEqual(red.tiles.map((t) => t.n), [1, 5]);
+  assert.equal(g.bonus, true);
+  // 남은 숫자 타일(파랑 15, 초록 15)은 닫힌 줄이라 놓을 수 없음 → 추가 차례만 넘김 (패스로 세지 않음)
+  g.pass('a');
+  assert.equal(g.current, 1);
+  assert.equal(g.passes, 0);
+});
+
+test('점수: 남은 숫자 합 + 기능 타일 1개당 20점 (룰북 예시 3 + 가위 = 23)', () => {
+  assert.equal(tilePenalty(S()), 20);
+  assert.equal(tilePenalty(T()), 20);
+  assert.equal(tilePenalty(E('red')), 16);
+  const g = new SixteenGame([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], { rng: seeded(21) });
+  for (const r of g.rows) r.tiles = [r.tiles[0], E(r.color)];
+  g.players[0].hand = [N('green', 3), S()];
+  g.players[1].hand = [N('red', 15)];
+  g.current = 1;
+  g.pass('b');
+  assert.throws(() => g.pass('a'), /패스할 수 없습니다/, '가위를 쓸 수 있으면 반드시 사용');
+  g.players[0].hand = [N('green', 3)];
+  g.pass('a');
+  assert.equal(g.phase, 'finished');
+  assert.deepEqual(g.standings().map((x) => x.score), [3, 15]);
 });
 
 test('패스는 놓을 수 있는 타일이 없을 때만 가능, 모두 패스하면 합이 적은 사람 승리', () => {
@@ -143,7 +196,7 @@ test('봇끼리 2~4인 게임을 끝까지 진행할 수 있다', () => {
     while (g.phase === 'playing') {
       const id = g.players[g.current].id;
       const m = botMove(g, id);
-      if (m.action === 'play') g.play(id, m.tileIds, m.row);
+      if (m.action === 'play') g.play(id, m.tileIds, m.row, m.count);
       else g.pass(id);
       assert.ok(++steps < 1000, 'game should terminate');
     }
@@ -166,13 +219,13 @@ test('toJSON/fromJSON 으로 저장했다 불러와도 게임이 이어진다', 
   const g = new SixteenGame([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }], { rng: seeded(11) });
   const id = g.players[g.current].id;
   const m = botMove(g, id);
-  g.play(id, m.tileIds, m.row);
+  g.play(id, m.tileIds, m.row, m.count);
   const restored = SixteenGame.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
   assert.deepEqual(restored.publicView(), g.publicView());
   assert.equal(restored.rng, Math.random);
   const next = restored.players[restored.current];
   const m2 = botMove(restored, next.id);
-  if (m2.action === 'play') restored.play(next.id, m2.tileIds, m2.row);
+  if (m2.action === 'play') restored.play(next.id, m2.tileIds, m2.row, m2.count);
   else restored.pass(next.id);
 });
 

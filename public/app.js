@@ -277,10 +277,24 @@ import { createNet } from './net.js';
   }
 
   /* ---------------- 규칙 ---------------- */
-  const FACES = { restart: '<small>16</small><b>↻</b>', end: '<small>16</small><b>END</b>', scissors: '✂', trash: '🗑' };
+  // 공식 타일 디자인: 1 아래 START, 16 아래 END, RESTART 는 화살표 테두리, 기능 타일은 검정 아이콘
+  const LOOP_SVG = '<svg class="loop" viewBox="0 0 40 40" aria-hidden="true">'
+    + '<path d="M9 5 H29 a5 5 0 0 1 5 5 V17"/><path class="head" d="M29.5 16 L34 22 L38.5 16 Z"/>'
+    + '<path d="M31 35 H11 a5 5 0 0 1 -5 -5 V23"/><path class="head" d="M1.5 24 L6 18 L10.5 24 Z"/></svg>';
+  const ICONS = {
+    scissors: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>',
+    trash: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
+  };
+  function tileFace(t) {
+    const k = t.k || 'num';
+    if (ICONS[k]) return ICONS[k];
+    if (k === 'restart') return `${LOOP_SVG}<span class="num">16</span><span class="sub">RESTART</span>`;
+    if (k === 'end') return '<span class="num">16</span><span class="sub">END</span>';
+    return `<span class="num">${t.n}</span>${t.n === 1 ? '<span class="sub">START</span>' : ''}`;
+  }
   const tileHTML = (t, cls = '') => {
     const k = t.k || 'num';
-    return `<div class="tile ${t.c || 'none'} k-${k} ${cls}" data-id="${t.id ?? ''}" title="${esc(Sixteen.describeTile({ k, ...t }))}">${k === 'num' ? t.n : FACES[k]}</div>`;
+    return `<div class="tile ${t.c || 'none'} k-${k} ${cls}" data-id="${t.id ?? ''}" title="${esc(Sixteen.describeTile({ k, ...t }))}">${tileFace(t)}</div>`;
   };
   const T = (n, c, k = 'num') => ({ n, c, k });
 
@@ -289,30 +303,35 @@ import { createNet } from './net.js';
       <div class="modal-head">식스틴 게임 규칙${closeBtn}</div>
       <div class="modal-body rules">
         <h4>🎯 목표</h4>
-        <p>가림막 뒤의 타일을 <b>가장 먼저 모두 내려놓으면</b> 승리합니다. 아무도 더 놓을 수 없게 되면 <b>남은 타일 숫자의 합이 가장 적은 사람</b>이 승리합니다.</p>
+        <p>가림막 뒤의 타일을 <b>가장 먼저 모두 내면</b> 즉시 승리합니다. 모두 더 이상 낼 수 없으면 <b>남은 타일 숫자의 합이 가장 적은 사람</b>이 이깁니다.</p>
         <h4>🧩 구성물 (88개)</h4>
-        <div class="example">${['red', 'yellow', 'green', 'blue', 'purple'].map((c) => tileHTML(T(15, c), 'sm')).join('')}
-          ${tileHTML(T(16, 'red', 'restart'), 'sm')}${tileHTML(T(16, 'red', 'end'), 'sm')}${tileHTML(T(0, null, 'scissors'), 'sm')}${tileHTML(T(0, null, 'trash'), 'sm')}</div>
+        <div class="example">${['red', 'orange', 'green', 'blue', 'black'].map((c, i) => tileHTML(T([1, 10, 7, 3, 12][i], c), 'sm')).join('')}
+          ${tileHTML(T(16, 'blue', 'restart'), 'sm')}${tileHTML(T(16, 'green', 'end'), 'sm')}${tileHTML(T(0, null, 'scissors'), 'sm')}${tileHTML(T(0, null, 'trash'), 'sm')}</div>
         <ul>
-          <li>빨강·노랑·초록·파랑·보라 5색 × (숫자 1~15 + <b>16 RESTART</b> + <b>16 END</b>) = 85개</li>
-          <li><b>가위</b> 2개, <b>쓰레기통</b> 1개</li>
+          <li>숫자 타일 85개: 빨강·주황·초록·파랑·검정 5색 × (1~15 + <b>16 RESTART</b> + <b>16 END</b>)</li>
+          <li>기능 타일 3개: <b>가위</b> 2개, <b>쓰레기통</b> 1개</li>
         </ul>
-        <h4>🃏 준비</h4>
-        <p>2인은 30개, 3인은 29개, 4인은 22개씩 나눠 받고 나머지는 사용하지 않습니다. <b>1 타일 5개를 모두 꺼내</b> 색깔별 줄 5개를 시작합니다. 타일은 가림막 뒤에서 자동으로 정렬되며 다른 사람은 개수만 볼 수 있습니다.</p>
-        <h4>▶️ 진행</h4>
-        <p>자기 차례에 <b>같은 색 타일 1개</b> 또는 <b>같은 색의 연속된 숫자 여러 개</b>를 그 색 줄 끝에 놓습니다. 줄 끝보다 <b>큰 숫자만</b> 놓을 수 있고, 숫자를 건너뛸 수도 있습니다.</p>
-        <div class="example">${tileHTML(T(1, 'red'), 'sm')}${tileHTML(T(4, 'red'), 'sm')}<span class="vs">+</span>${tileHTML(T(5, 'red'), 'sm')}${tileHTML(T(6, 'red'), 'sm')}${tileHTML(T(7, 'red'), 'sm')}<span class="vs">또는</span>${tileHTML(T(12, 'red'), 'sm')}</div>
-        <p class="note">건너뛴 숫자(위 예에서 12를 놓으면 빨강 5~11)는 그 줄에 더 이상 놓을 수 없습니다.</p>
-        <h4>✨ 특수 타일</h4>
+        <h4>🃏 게임 준비</h4>
         <ul>
-          <li>${tileHTML(T(16, 'blue', 'restart'), 'sm inline')} <b>RESTART</b> — 16으로 놓이고, 이후 0으로 취급되어 그 줄을 처음부터 다시 이어갈 수 있습니다.</li>
-          <li>${tileHTML(T(16, 'blue', 'end'), 'sm inline')} <b>END</b> — 16으로 놓이고, 그 줄을 닫습니다.</li>
-          <li>${tileHTML(T(0, null, 'scissors'), 'sm inline')} <b>가위</b> — 원하는 줄의 마지막 타일 1개를 제거합니다.</li>
-          <li>${tileHTML(T(0, null, 'trash'), 'sm inline')} <b>쓰레기통</b> — 원하는 줄을 1만 남기고 모두 비웁니다.</li>
+          <li>4인 22개, 3인 29개, 2인 30개씩 나눠 받습니다 (남은 타일은 사용하지 않음). 타일은 가림막 뒤에서 색깔별로 정리됩니다.</li>
+          <li>2인은 숫자 1 타일 5개를 먼저 꺼내 놓고 나눕니다.</li>
+          <li>각자 가진 숫자 1 타일을 모두 테이블에 내고, <b>빨강 1을 낸 사람</b>부터 시계 방향으로 진행합니다. (2인은 무작위로 선을 정합니다)</li>
+        </ul>
+        <h4>▶️ 게임 진행</h4>
+        <p>자기 차례에 한 가지 색을 골라, 그 색의 <b>가장 마지막 타일보다 큰</b> 숫자 타일 1개 또는 <b>연속된 숫자 그룹</b>(2개 이상)을 냅니다. 숫자를 건너뛸 수 있습니다.</p>
+        <div class="example">${tileHTML(T(1, 'blue'), 'sm')}<span class="vs">‹</span>${tileHTML(T(7, 'blue'), 'sm')}<span class="vs">‹</span>${tileHTML(T(10, 'blue'), 'sm')}<span class="vs">…</span>${tileHTML(T(5, 'blue'), 'sm')}<span class="vs">✕</span>
+          <span class="vs">그룹</span>${tileHTML(T(10, 'green'), 'sm')}${tileHTML(T(11, 'green'), 'sm')}${tileHTML(T(12, 'green'), 'sm')}</div>
+        <h4>✨ 기능 타일</h4>
+        <ul>
+          <li>${tileHTML(T(16, 'blue', 'restart'), 'sm inline')} <b>16 RESTART</b> — 놓으면 1로 바뀌어, 그 색을 다시 1보다 큰 숫자부터 놓을 수 있습니다.</li>
+          <li>${tileHTML(T(16, 'red', 'end'), 'sm inline')} <b>16 END</b> — 그 색에는 더 이상 놓을 수 없습니다. 가위·쓰레기통으로 END를 제거하면 다시 놓을 수 있습니다. 한 번에 RESTART와 END를 함께 놓을 수는 없습니다.</li>
+          <li>${tileHTML(T(0, null, 'scissors'), 'sm inline')} <b>가위</b> — 한 가지 색의 가장 마지막 타일 1개를 제거하고, 숫자 타일을 <b>한 번 더</b> 놓을 수 있습니다.</li>
+          <li>${tileHTML(T(0, null, 'trash'), 'sm inline')} <b>쓰레기통</b> — 한 가지 색에서 원하는 만큼(1 타일 제외) 제거하고, 숫자 타일을 <b>한 번 더</b> 놓을 수 있습니다.</li>
         </ul>
         <h4>⏭️ 패스와 종료</h4>
-        <p>놓을 수 있는 타일이 <b>없을 때만</b> 패스합니다. 누군가 타일을 모두 내려놓거나, 모두가 연속으로 패스하면 게임이 끝납니다. 남은 타일은 숫자 값(RESTART·END는 16, 가위·쓰레기통은 0)만큼 벌점이 됩니다.</p>
-        <p class="note">※ 공식 구성물과 룰 설명을 바탕으로 구현했습니다. 가위·쓰레기통의 벌점(0점)처럼 확인되지 않은 세부 사항은 공식 룰북과 다를 수 있습니다.</p>
+        <p>낼 수 있는 타일이 없을 때만 패스합니다. 한 사람이 타일을 모두 내면 즉시 끝나고, 모두 더 이상 낼 수 없어도 끝납니다.</p>
+        <p><b>점수</b>: 남은 타일에 적힌 숫자의 합 (16 타일은 16). 기능 타일은 반드시 사용해야 하며, 남아 있으면 <b>각각 20점</b>으로 계산합니다.</p>
+        <p class="note">※ 매직빈게임즈 식스틴 공식 룰을 바탕으로 구현했습니다. 2인 선 정하기(가위바위보)는 무작위로 대신합니다.</p>
         <div class="modal-actions"><button class="btn primary" id="rulesOk">확인</button></div>
       </div>`, { wide: true, dismissable: !back });
     const done = () => (back ? back() : closeModal());
@@ -381,7 +400,7 @@ import { createNet } from './net.js';
       $('#emptyCreate').onclick = showCreate;
       return;
     }
-    const fanColors = ['red', 'yellow', 'green', 'blue', 'purple'];
+    const fanColors = ['red', 'orange', 'green', 'blue', 'black'];
     feed.innerHTML = list.map((r) => {
       const seed = [...r.code].reduce((a, c) => a + c.charCodeAt(0), 0);
       const fan = Array.from({ length: 5 }, (_, i) => {
@@ -485,7 +504,7 @@ import { createNet } from './net.js';
 
   function renderWaiting() {
     const r = state.room;
-    const colors = ['red', 'yellow', 'green', 'blue', 'purple'];
+    const colors = ['red', 'orange', 'green', 'blue', 'black'];
     $('.tile-deco').innerHTML = [1, 6, 16, 6, 1].map((n, i) => tileHTML(T(n, colors[i]), 'md')).join('');
     const slots = [];
     for (const m of r.memberList) {
@@ -572,27 +591,30 @@ import { createNet } from './net.js';
       const tiles = row.tiles.length > 10 ? [row.tiles[0], null, ...row.tiles.slice(-8)] : row.tiles;
       const justPlayed = g.lastPlay && g.lastPlay.row === row.color;
       return `
-        <div class="row ${row.closed ? 'closed' : ''} ${justPlayed ? 'just' : ''}" data-row="${row.color}">
+        <div class="row ${row.closed || !row.tiles.length ? 'closed' : ''} ${justPlayed ? 'just' : ''}" data-row="${row.color}">
           <span class="row-label ${row.color}">${Sixteen.COLOR_NAMES[row.color]}</span>
-          <div class="row-tiles">${tiles.map((t) => (t ? tileHTML(t, 'md') : '<span class="row-gap">…</span>')).join('')}</div>
-          <span class="row-top">${row.closed ? '■ 닫힘' : row.top === 0 ? '↻ 1부터' : `${row.top} 초과`}</span>
+          <div class="row-tiles">${tiles.length ? tiles.map((t) => (t ? tileHTML(t, 'md') : '<span class="row-gap">…</span>')).join('') : '<span class="row-gap">이 색의 1 타일이 상자에 남아 놓을 수 없습니다</span>'}</div>
+          <span class="row-top">${!row.tiles.length ? '1 없음' : row.closed ? '■ 닫힘' : `${row.top} 초과`}</span>
         </div>`;
     }).join('');
     $$('#rows .row').forEach((el) => (el.onclick = () => playOnRow(el.dataset.row)));
 
     const cur = g.players[g.current];
     const hand = g.hand || [];
-    const canMove = myTurn && Sixteen.hasLegalMove(g.rows, hand);
+    const rules = { numbersOnly: g.bonus };
+    const canMove = myTurn && Sixteen.hasLegalMove(g.rows, hand, rules);
     const banner = $('#turnBanner');
     if (g.phase !== 'playing') {
       banner.className = 'turn-banner';
       banner.textContent = '🏆 게임 종료';
     } else if (myTurn) {
       banner.className = 'turn-banner mine';
-      banner.textContent = canMove ? '내 차례! 같은 색 줄 끝보다 큰 숫자를 놓으세요' : '놓을 수 있는 타일이 없어요 — 패스하세요';
+      banner.textContent = g.bonus
+        ? (canMove ? '✨ 숫자 타일을 한 번 더 놓을 수 있어요!' : '더 놓을 숫자 타일이 없어요 — 차례를 넘기세요')
+        : (canMove ? '내 차례! 같은 색 줄 끝보다 큰 숫자를 놓으세요' : '낼 수 있는 타일이 없어요 — 패스하세요');
     } else {
       banner.className = 'turn-banner';
-      banner.textContent = `${cur.name}님의 차례${cur.isBot ? ' 🤖 생각 중…' : '…'}`;
+      banner.textContent = `${cur.name}님의 차례${g.bonus ? ' (한 번 더)' : ''}${cur.isBot ? ' 🤖 생각 중…' : '…'}`;
     }
 
     // 내 손패
@@ -605,7 +627,7 @@ import { createNet } from './net.js';
       tileHTML(t, `${state.selected.has(t.id) ? 'sel' : ''} ${state.newIds.has(t.id) ? 'new' : ''}`)).join('');
     $$('#hand .tile').forEach((el) => (el.onclick = () => toggleTile(Number(el.dataset.id))));
     $('#passBtn').disabled = !myTurn || canMove;
-    $('#passBtn').textContent = '패스';
+    $('#passBtn').textContent = g.bonus ? '넘기기' : '패스';
     updateSelection();
   }
 
@@ -622,7 +644,7 @@ import { createNet } from './net.js';
     const hand = g?.hand || [];
     const tiles = hand.filter((t) => state.selected.has(t.id));
     if (!g || !tiles.length) return { tiles, v: null };
-    return { tiles, v: Sixteen.validatePlay(g.rows, tiles, rowColor) };
+    return { tiles, v: Sixteen.validatePlay(g.rows, tiles, rowColor, { numbersOnly: g.bonus }) };
   }
 
   function updateSelection() {
@@ -639,9 +661,10 @@ import { createNet } from './net.js';
     }
     const special = tiles.length === 1 && Sixteen.isColorless(tiles[0]);
     if (special) {
-      const targets = g.rows.filter((r) => Sixteen.validatePlay(g.rows, tiles, r.color).ok);
+      const targets = g.rows.filter((r) => Sixteen.validatePlay(g.rows, tiles, r.color, { numbersOnly: g.bonus }).ok);
       targets.forEach((r) => $(`#rows .row[data-row="${r.color}"]`)?.classList.add('target'));
-      info.textContent = targets.length ? `${Sixteen.describeTile(tiles[0])} — 사용할 줄을 누르세요` : '✕ 사용할 수 있는 줄이 없어요';
+      info.textContent = g.bonus ? '✕ 이번에는 숫자 타일만 놓을 수 있어요'
+        : targets.length ? `${Sixteen.describeTile(tiles[0])} — 사용할 줄을 누르세요` : '✕ 사용할 수 있는 줄이 없어요';
       info.classList.add(targets.length ? 'ok' : 'bad');
       return;
     }
@@ -656,14 +679,35 @@ import { createNet } from './net.js';
     }
   }
 
-  async function play(rowColor) {
+  async function play(rowColor, count) {
     const { tiles, v } = currentSelection(rowColor);
     if (!v || !v.ok) {
       if (v) toast(v.error, true);
       return;
     }
-    const res = await emit('play', { tileIds: tiles.map((t) => t.id), row: v.row });
+    if (v.kind === 'trash' && count == null) return pickTrashCount(v.row, v.max);
+    const res = await emit('play', { tileIds: tiles.map((t) => t.id), row: v.row, count });
     if (res.ok) state.selected.clear();
+  }
+
+  /** 쓰레기통: 줄 끝에서 몇 개를 제거할지 고른다 (1 타일 제외). */
+  function pickTrashCount(rowColor, max) {
+    const row = state.room.game.rows.find((r) => r.color === rowColor);
+    const box = openModal(`
+      <div class="modal-head">🗑 쓰레기통 — ${Sixteen.COLOR_NAMES[rowColor]} 줄${closeBtn}</div>
+      <div class="modal-body">
+        <p class="center">줄 끝에서 제거할 타일 개수를 고르세요. (1 타일은 남습니다)</p>
+        <div class="example trash-pick" id="trashRow" style="justify-content:center">${row.tiles.map((t) => tileHTML(t, 'sm')).join('')}</div>
+        <div class="count-btns">${Array.from({ length: max }, (_, i) => `<button class="btn" data-count="${i + 1}">${i + 1}개</button>`).join('')}</div>
+      </div>`);
+    const tilesEl = $$('#trashRow .tile', box);
+    const mark = (n) => tilesEl.forEach((el, i) => el.classList.toggle('gone', i >= tilesEl.length - n));
+    $$('[data-count]', box).forEach((b) => {
+      b.onmouseenter = () => mark(Number(b.dataset.count));
+      b.onfocus = () => mark(Number(b.dataset.count));
+      b.onclick = () => { closeModal(); play(rowColor, Number(b.dataset.count)); };
+    });
+    mark(max);
   }
 
   function playOnRow(rowColor) {

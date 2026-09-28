@@ -82,7 +82,7 @@ test('Supabase: 방 → 게임 → Realtime → 보안 정책', { skip: !URL || 
     const p = byMember[cur.id];
     if (!p) { await new Promise((r) => setTimeout(r, 150)); continue; } // 봇 차례: 서버가 진행
     const hand = (await p.sb.from('hands').select('tiles').eq('room_code', code).single()).data.tiles;
-    const moves = legalMoves(g.rows, hand);
+    const moves = legalMoves(g.rows, hand, { numbersOnly: g.bonus });
     const res = moves.length ? await p.call('play', moves[0]) : await p.call('pass');
     if (!res.ok && !/차례|먼저/.test(res.error)) assert.fail(res.error);
   }
