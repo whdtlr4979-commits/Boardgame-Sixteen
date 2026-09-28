@@ -1,21 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" width="100" height="108">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="100" height="104">
   <title>파랑 14</title>
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#faf9f5"/>
-      <stop offset="1" stop-color="#ebe6db"/>
-    </linearGradient>
-    <linearGradient id="back" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#feda75"/>
-      <stop offset="0.3" stop-color="#fa7e1e"/>
-      <stop offset="0.6" stop-color="#d62976"/>
-      <stop offset="1" stop-color="#4f5bd5"/>
-    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="130%" height="130%"><feGaussianBlur stdDeviation="1.6"/></filter>
   </defs>
-  <!-- 타일 옆면 -->
-  <rect x="1" y="8" width="98" height="99" rx="17" fill="#d3ccbb"/>
+  <!-- 그림자 -->
+  <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
-  <rect x="1" y="1" width="98" height="99" rx="17" fill="url(#face)" stroke="#e0dacd" stroke-width="1.5"/>
-  <text x="50" y="70" text-anchor="middle" font-family="Georgia, 'Noto Serif', 'Times New Roman', serif" font-weight="700" font-size="54" letter-spacing="-3" fill="#2466d1">14</text>
+  <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
+  <path d="M43.86 76.75L8 76.75L8 74.43L20.21 74.43L20.21 23.73L8 23.73L8 21.41L32.42 21.41L32.42 74.43L43.86 74.43L43.86 76.75M85.36 76.75L57.39 76.75L57.39 74.43L65.73 74.43L65.73 61.29L42.24 61.29L42.24 58.74L70.06 20.18L77.94 20.18L77.94 58.82L87.6 58.82L87.6 52.71L90 52.71L90 67.63L87.6 67.63L87.6 61.29L77.94 61.29L77.94 74.43L85.36 74.43L85.36 76.75M45.79 58.51L45.79 58.82L65.73 58.82L65.73 31.31L65.42 31.31L45.79 58.51" fill="#1d74c4"/>
 </svg>

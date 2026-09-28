@@ -1,21 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" width="100" height="108">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="100" height="104">
   <title>파랑 5</title>
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#faf9f5"/>
-      <stop offset="1" stop-color="#ebe6db"/>
-    </linearGradient>
-    <linearGradient id="back" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#feda75"/>
-      <stop offset="0.3" stop-color="#fa7e1e"/>
-      <stop offset="0.6" stop-color="#d62976"/>
-      <stop offset="1" stop-color="#4f5bd5"/>
-    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="130%" height="130%"><feGaussianBlur stdDeviation="1.6"/></filter>
   </defs>
-  <!-- 타일 옆면 -->
-  <rect x="1" y="8" width="98" height="99" rx="17" fill="#d3ccbb"/>
+  <!-- 그림자 -->
+  <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
-  <rect x="1" y="1" width="98" height="99" rx="17" fill="url(#face)" stroke="#e0dacd" stroke-width="1.5"/>
-  <text x="50" y="70" text-anchor="middle" font-family="Georgia, 'Noto Serif', 'Times New Roman', serif" font-weight="700" font-size="60" letter-spacing="-3" fill="#2466d1">5</text>
+  <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
+  <path d="M45.53 78.97L45.53 78.97Q39.48 78.97 35.21 77.52Q30.94 76.06 28.68 73.48Q26.42 70.9 26.42 67.6Q26.42 64.29 28.44 62.27Q30.45 60.26 33.68 60.26L33.68 60.26Q36.26 60.26 38.35 61.67Q40.45 63.08 40.45 66.23L40.45 66.23Q40.45 68.16 39.69 69.25Q38.92 70.34 37.95 70.98Q36.98 71.63 36.22 72.15Q35.45 72.68 35.45 73.4L35.45 73.4Q35.45 74.37 36.74 74.98Q38.03 75.58 39.93 75.86Q41.82 76.15 43.52 76.15L43.52 76.15Q49.73 76.15 53.07 72.48Q56.42 68.81 56.42 61.39L56.42 61.39Q56.42 53.08 52.55 49.37Q48.68 45.66 42.63 45.66L42.63 45.66Q39.73 45.66 36.66 46.35Q33.6 47.03 32.31 48.08L32.31 48.08L30.94 47.19L33.27 20.26L60.77 20.26Q63.27 20.26 64.32 19.69Q65.37 19.13 66.18 17.19L66.18 17.19L68.6 17.19L65.69 31.47L35.69 31.47L35.53 30.66L34.32 43.65Q35.13 43.48 36.18 43.16L36.18 43.16Q38.44 42.68 41.54 42.31Q44.65 41.95 47.87 41.95L47.87 41.95Q55.94 41.95 61.18 44.41Q66.42 46.87 69 50.94Q71.58 55.02 71.58 59.94L71.58 59.94Q71.58 65.9 68.07 70.18Q64.56 74.45 58.68 76.71Q52.79 78.97 45.53 78.97" fill="#1d74c4"/>
 </svg>

@@ -1,21 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" width="100" height="108">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="100" height="104">
   <title>주황 7</title>
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#faf9f5"/>
-      <stop offset="1" stop-color="#ebe6db"/>
-    </linearGradient>
-    <linearGradient id="back" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#feda75"/>
-      <stop offset="0.3" stop-color="#fa7e1e"/>
-      <stop offset="0.6" stop-color="#d62976"/>
-      <stop offset="1" stop-color="#4f5bd5"/>
-    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="130%" height="130%"><feGaussianBlur stdDeviation="1.6"/></filter>
   </defs>
-  <!-- 타일 옆면 -->
-  <rect x="1" y="8" width="98" height="99" rx="17" fill="#d3ccbb"/>
+  <!-- 그림자 -->
+  <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
-  <rect x="1" y="1" width="98" height="99" rx="17" fill="url(#face)" stroke="#e0dacd" stroke-width="1.5"/>
-  <text x="50" y="70" text-anchor="middle" font-family="Georgia, 'Noto Serif', 'Times New Roman', serif" font-weight="700" font-size="60" letter-spacing="-3" fill="#ef7d12">7</text>
+  <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
+  <path d="M48.23 78.97L48.23 78.97Q44.44 78.97 42.51 77.03Q40.57 75.1 40.57 71.79L40.57 71.79Q40.57 69.77 41.34 67.68Q42.1 65.58 43.8 62.56Q45.49 59.53 48.15 54.94L48.15 54.94L61.86 31.47L35.41 31.47Q34.2 31.47 33.52 32.07Q32.83 32.68 32.19 34.53L32.19 34.53L30.25 40.26L27.43 40.26L32.75 20.26L70.57 20.26L70.57 24.29L58.96 44.29Q56.22 48.97 55.05 52.48Q53.88 55.98 53.88 58.81L53.88 58.81Q53.88 60.98 54.28 62.8Q54.69 64.61 55.17 66.19Q55.65 67.76 56.06 69.25Q56.46 70.74 56.46 72.19L56.46 72.19Q56.46 75.66 54.04 77.31Q51.62 78.97 48.23 78.97" fill="#f18a00"/>
 </svg>

@@ -1,21 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 108" width="100" height="108">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="100" height="104">
   <title>초록 6</title>
   <defs>
-    <linearGradient id="face" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="0.55" stop-color="#faf9f5"/>
-      <stop offset="1" stop-color="#ebe6db"/>
-    </linearGradient>
-    <linearGradient id="back" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#feda75"/>
-      <stop offset="0.3" stop-color="#fa7e1e"/>
-      <stop offset="0.6" stop-color="#d62976"/>
-      <stop offset="1" stop-color="#4f5bd5"/>
-    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="130%" height="130%"><feGaussianBlur stdDeviation="1.6"/></filter>
   </defs>
-  <!-- 타일 옆면 -->
-  <rect x="1" y="8" width="98" height="99" rx="17" fill="#d3ccbb"/>
+  <!-- 그림자 -->
+  <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
-  <rect x="1" y="1" width="98" height="99" rx="17" fill="url(#face)" stroke="#e0dacd" stroke-width="1.5"/>
-  <text x="50" y="70" text-anchor="middle" font-family="Georgia, 'Noto Serif', 'Times New Roman', serif" font-weight="700" font-size="60" letter-spacing="-3" fill="#15935a">6</text>
+  <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
+  <path d="M49.04 72.9L49.04 72.9Q43.17 72.9 38.42 70.08Q33.68 67.26 30.86 62.14Q28.04 57.02 28.04 50.1L28.04 50.1Q28.04 43.32 30.94 37.19Q33.83 31.05 38.84 26.2Q43.84 21.34 50.32 18.41Q56.79 15.47 63.94 15.25L63.94 15.25L63.94 17.81Q57.77 18.41 53.18 21.61Q48.59 24.81 45.76 29.66Q42.94 34.52 42.11 40.31L42.11 40.31L42.34 40.39Q44.3 38.81 46.59 37.94Q48.89 37.08 51.9 37.08L51.9 37.08Q56.94 37.08 61.01 39.33Q65.07 41.59 67.52 45.47Q69.96 49.34 69.96 54.24L69.96 54.24Q69.96 58.3 68.27 61.69Q66.58 65.08 63.6 67.6Q60.63 70.12 56.87 71.51Q53.1 72.9 49.04 72.9M48.81 70.27L48.81 70.27Q51.82 70.27 53.55 68.84Q55.28 67.41 56.04 64.1Q56.79 60.78 56.79 55.14L56.79 55.14Q56.79 48.97 56.04 45.73Q55.28 42.49 53.78 41.29Q52.27 40.09 50.09 40.09L50.09 40.09Q47.01 40.09 44.86 41.67Q42.72 43.25 41.44 45.43L41.44 45.43Q40.91 47.84 40.8 50.55Q40.68 53.26 40.68 55.37L40.68 55.37Q40.68 61.01 41.47 64.25Q42.26 67.48 44.07 68.88Q45.88 70.27 48.81 70.27" fill="#12924a"/>
+  <circle cx="49" cy="83" r="4.2" fill="#12924a"/>
 </svg>
