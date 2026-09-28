@@ -125,6 +125,24 @@ SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_ANON_KEY=<anon key> npm run test:e2
 게임 엔진 원본은 `supabase/functions/_shared/game.js` 입니다. 수정한 뒤 `npm run sync` 로 `public/game.js` 에 복사하세요.
 (두 파일이 다르면 `npm test` 가 실패합니다.)
 
+## 타일 이미지 수정하기
+
+타일 그림은 `public/tiles/` 폴더의 **SVG 파일 88개**입니다. 게임은 이 파일을 그대로 불러오므로, 파일을 고치고 `main`에 올리면 사이트에 바로 반영됩니다.
+
+| 파일 | 타일 |
+| --- | --- |
+| `red-1.svg` ~ `red-15.svg` | 숫자 타일 (색: `red`, `orange`, `green`, `blue`, `black`) |
+| `red-restart.svg`, `red-end.svg` … | 16 RESTART, 16 END (색마다 하나씩) |
+| `scissors.svg`, `trash.svg` | 가위, 쓰레기통 |
+| `back.svg` | 다른 사람의 가려진 타일(뒷면) |
+
+- **미리보기:** 배포된 사이트의 `/tiles/` 주소(로컬은 `npm run dev` 후 `http://localhost:5173/tiles/`)에서 모든 타일을 파일 이름과 함께 볼 수 있습니다.
+- **수정 방법:** Figma·Illustrator·Inkscape 같은 그림 프로그램으로 열어 고치거나, 메모장으로 열어 색상 코드·글자를 바꿔도 됩니다. **파일 이름은 바꾸지 마세요.**
+- **크기:** 원본은 가로 100 × 세로 108 비율(아래쪽 7은 타일 옆면)입니다. 비율이 다르면 화면에서 늘어나 보일 수 있습니다.
+- **PNG로 바꾸려면:** 모든 타일을 같은 이름의 `.png`로 저장하고 `public/app.js`의 `TILE_EXT = 'svg'`를 `'png'`로 바꾸세요.
+- **처음 디자인으로 되돌리기:** `npm run tiles -- --force` (수정한 파일이 덮어써지니 주의). 빠진 파일만 다시 만들려면 `npm run tiles`.
+- 파일 이름 규칙과 파일이 모두 있는지는 `npm test`가 확인합니다.
+
 ## 게임 규칙 (매직빈게임즈 공식 룰 기준)
 
 | 항목 | 내용 |

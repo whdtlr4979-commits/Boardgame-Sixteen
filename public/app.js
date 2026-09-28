@@ -277,25 +277,21 @@ import { createNet } from './net.js';
   }
 
   /* ---------------- 규칙 ---------------- */
-  // 공식 타일 디자인: 1 아래 START, 16 아래 END, RESTART 는 화살표 테두리, 기능 타일은 검정 아이콘
-  const LOOP_SVG = '<svg class="loop" viewBox="0 0 40 40" aria-hidden="true">'
-    + '<path d="M9 5 H29 a5 5 0 0 1 5 5 V17"/><path class="head" d="M29.5 16 L34 22 L38.5 16 Z"/>'
-    + '<path d="M31 35 H11 a5 5 0 0 1 -5 -5 V23"/><path class="head" d="M1.5 24 L6 18 L10.5 24 Z"/></svg>';
-  const ICONS = {
-    scissors: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>',
-    trash: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
-  };
-  function tileFace(t) {
+  // 타일 그림은 public/tiles/ 의 이미지 파일을 사용한다 (파일을 고치면 게임에 바로 반영).
+  // PNG 등 다른 형식으로 바꾸려면 파일을 같은 이름으로 저장하고 TILE_EXT 만 바꾸면 된다.
+  const TILE_DIR = 'tiles/';
+  const TILE_EXT = 'svg';
+  function tileFile(t) {
     const k = t.k || 'num';
-    if (ICONS[k]) return ICONS[k];
-    if (k === 'restart') return `${LOOP_SVG}<span class="num">16</span><span class="sub">RESTART</span>`;
-    if (k === 'end') return '<span class="num">16</span><span class="sub">END</span>';
-    return `<span class="num">${t.n}</span>${t.n === 1 ? '<span class="sub">START</span>' : ''}`;
+    const name = k === 'scissors' || k === 'trash' ? k : k === 'num' ? `${t.c}-${t.n}` : `${t.c}-${k}`;
+    return `${TILE_DIR}${name}.${TILE_EXT}`;
   }
   const tileHTML = (t, cls = '') => {
     const k = t.k || 'num';
-    return `<div class="tile ${t.c || 'none'} k-${k} ${cls}" data-id="${t.id ?? ''}" title="${esc(Sixteen.describeTile({ k, ...t }))}">${tileFace(t)}</div>`;
+    const label = esc(Sixteen.describeTile({ k, ...t }));
+    return `<div class="tile ${t.c || 'none'} k-${k} ${cls}" data-id="${t.id ?? ''}" title="${label}"><img src="${tileFile(t)}" alt="${label}" draggable="false"></div>`;
   };
+  const backHTML = () => `<div class="tile back"><img src="${TILE_DIR}back.${TILE_EXT}" alt="" draggable="false"></div>`;
   const T = (n, c, k = 'num') => ({ n, c, k });
 
   function showRules(back) {
@@ -404,7 +400,7 @@ import { createNet } from './net.js';
     feed.innerHTML = list.map((r) => {
       const seed = [...r.code].reduce((a, c) => a + c.charCodeAt(0), 0);
       const fan = Array.from({ length: 5 }, (_, i) => {
-        const n = ((seed * (i + 3)) % 16) + 1;
+        const n = ((seed * (i + 3)) % 15) + 1;
         const rot = (i - 2) * 9;
         return `<div style="transform:rotate(${rot}deg) translateY(${Math.abs(i - 2) * 6}px)">${tileHTML(T(n, fanColors[(seed + i) % 5]), 'lg')}</div>`;
       }).join('');
@@ -505,7 +501,7 @@ import { createNet } from './net.js';
   function renderWaiting() {
     const r = state.room;
     const colors = ['red', 'orange', 'green', 'blue', 'black'];
-    $('.tile-deco').innerHTML = [1, 6, 16, 6, 1].map((n, i) => tileHTML(T(n, colors[i]), 'md')).join('');
+    $('.tile-deco').innerHTML = [1, 6, 16, 6, 1].map((n, i) => tileHTML(T(n, colors[i], n === 16 ? 'end' : 'num'), 'md')).join('');
     const slots = [];
     for (const m of r.memberList) {
       slots.push(`
@@ -564,7 +560,7 @@ import { createNet } from './net.js';
     const rotated = me >= 0 ? [...order.slice(me + 1), ...order.slice(0, me)] : order;
     $('#opponents').innerHTML = rotated.map((p) => {
       const turn = g.phase === 'playing' && g.current === p.seat;
-      const backs = Array.from({ length: Math.min(p.count, 8) }, () => '<div class="tile back"></div>').join('');
+      const backs = Array.from({ length: Math.min(p.count, 8) }, backHTML).join('');
       const member = r.memberList.find((m) => m.id === p.id);
       const online = !member || member.online;
       const stalled = turn && !p.isBot && g.lastMoveAt && Date.now() - g.lastMoveAt > STALL_MS;
