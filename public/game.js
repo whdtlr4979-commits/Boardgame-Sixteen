@@ -3,28 +3,39 @@
  * 브라우저(public/game.js)와 Supabase Edge Function이 같은 코드를 사용한다.
  * public/game.js는 `npm run sync` 로 이 파일을 복사한 것이다.
  *
- * 구성물 (88개)
- *   색마다 숫자 1~15 + 16 RESTART + 16 END = 17개 × 5색 = 85개
- *   가위 2개, 쓰레기통 1개
+ * 공식 룰북(매직빈게임즈) 기준
  *
- * 규칙
- *   - 타일을 인원수에 따라 나눠 준다 (2인 30개, 3인 29개, 4인 22개, 나머지는 사용하지 않음).
- *   - 1 타일 5개를 모두 꺼내 색깔별 줄 5개를 시작한다.
- *   - 자기 차례에 같은 색 타일 1개 또는 연속된 숫자 여러 개를 그 색 줄 끝에 놓는다.
- *     줄 끝보다 큰 숫자만 놓을 수 있고, 숫자를 건너뛸 수 있다.
- *   - RESTART: 16으로 놓이고 이후 0으로 취급 → 그 줄을 처음부터 다시 이어갈 수 있다.
- *   - END: 16으로 놓이고 그 줄을 닫는다.
- *   - 가위: 원하는 줄의 마지막 타일 1개를 제거한다. 쓰레기통: 원하는 줄을 1만 남기고 비운다.
- *   - 놓을 수 있는 타일이 없을 때만 패스한다.
- *   - 손패를 모두 내려놓은 사람이 승리. 모두 연속으로 패스하면(아무도 놓을 수 없으면)
- *     남은 타일 숫자 합이 가장 적은 사람이 승리.
+ * 구성물 (88개)
+ *   숫자 타일 85개: 5색(빨강·주황·초록·파랑·검정) × (1~15 + 16 RESTART + 16 END)
+ *   기능 타일 3개: 가위 2개, 쓰레기통 1개
+ *
+ * 준비
+ *   - 2인: 숫자 1 타일 5개를 먼저 테이블에 꺼낸 뒤 나머지를 섞어 30개씩 나눈다.
+ *   - 3인 29개, 4인 22개씩 나눈다(남은 타일은 사용하지 않음).
+ *     각자 가진 숫자 1 타일을 모두 테이블에 내고, 빨강 1을 낸 사람부터 시작한다.
+ *     (2인이거나 빨강 1이 남은 타일에 있으면 무작위로 시작 — 가위바위보 대신)
+ *
+ * 진행
+ *   - 한 가지 색을 골라 그 색 줄의 마지막 타일보다 큰 숫자 타일 1개, 또는
+ *     연속된 숫자 여러 개(그룹)를 놓는다. 숫자를 건너뛸 수 있다.
+ *   - 16 RESTART: 놓으면 1로 바뀌어 그 색을 다시 1보다 큰 숫자부터 놓을 수 있다.
+ *   - 16 END: 그 색에는 더 이상 놓을 수 없다(가위·쓰레기통으로 제거하면 다시 가능).
+ *     한 번에 RESTART와 END를 함께 놓을 수 없다.
+ *   - 가위: 한 가지 색의 마지막 타일 1개를 제거하고, 숫자 타일을 한 번 더 놓을 수 있다.
+ *   - 쓰레기통: 한 가지 색에서 원하는 만큼(1 타일 제외) 제거하고, 숫자 타일을 한 번 더 놓을 수 있다.
+ *   - 낼 수 있는 타일이 없을 때만 패스한다.
+ *
+ * 종료
+ *   - 한 사람이 타일을 모두 내면 즉시 승리.
+ *   - 모두 더 이상 낼 수 없으면 종료, 남은 숫자 합이 가장 적은 사람이 승리.
+ *     남은 기능 타일(가위·쓰레기통)은 각각 20점으로 계산한다.
  */
 
 /** 규칙 위반 — 메시지를 그대로 사용자에게 보여줘도 되는 오류. */
 export class RuleError extends Error {}
 
-export const COLORS = ['red', 'yellow', 'green', 'blue', 'purple'];
-export const COLOR_NAMES = { red: '빨강', yellow: '노랑', green: '초록', blue: '파랑', purple: '보라' };
+export const COLORS = ['red', 'orange', 'green', 'blue', 'black'];
+export const COLOR_NAMES = { red: '빨강', orange: '주황', green: '초록', blue: '파랑', black: '검정' };
 export const MAX_NUMBER = 15;
 export const SPECIAL_VALUE = 16;
 export const MIN_PLAYERS = 2;
@@ -32,6 +43,8 @@ export const MAX_PLAYERS = 4;
 export const HAND_SIZE = { 2: 30, 3: 29, 4: 22 };
 export const SCISSORS_COUNT = 2;
 export const TRASH_COUNT = 1;
+/** 게임이 끝났을 때 남아 있는 기능 타일(가위·쓰레기통) 1개당 점수 */
+export const SPECIAL_PENALTY = 20;
 
 /** 타일 종류: num(숫자), restart, end, scissors(가위), trash(쓰레기통) */
 export const isColorless = (t) => t.k === 'scissors' || t.k === 'trash';
@@ -68,9 +81,9 @@ export function sortHand(hand) {
   return hand.slice().sort((a, b) => key(a) - key(b) || a.id - b.id);
 }
 
-/** 남은 타일 벌점: 숫자는 그 값, RESTART·END는 16, 가위·쓰레기통은 0. */
+/** 남은 타일 점수: 숫자는 적힌 값(RESTART·END는 16), 가위·쓰레기통은 20. */
 export function tilePenalty(t) {
-  return isColorless(t) ? 0 : t.n;
+  return isColorless(t) ? SPECIAL_PENALTY : t.n;
 }
 
 export function describeTile(t) {
@@ -82,10 +95,11 @@ export function describeTile(t) {
   return `${color} ${t.n}`;
 }
 
-/** 줄 끝의 현재 값 (RESTART 뒤에는 0). */
+/** 줄 끝의 현재 값 (RESTART 는 1로 바뀐다). 시작되지 않은 줄(1이 없음)은 null. */
 export function rowTop(row) {
+  if (!row.tiles.length) return null;
   let top = 0;
-  for (const t of row.tiles) top = t.k === 'restart' ? 0 : t.n;
+  for (const t of row.tiles) top = t.k === 'restart' ? 1 : t.n;
   return top;
 }
 
@@ -98,27 +112,35 @@ function rowClosed(row) {
  * 선택한 타일을 놓을 수 있는지 검사한다.
  * @returns {{ok:true, row:string, kind:string, label:string} | {ok:false, error:string}}
  */
-export function validatePlay(rows, tiles, rowColor) {
+export function validatePlay(rows, tiles, rowColor, opts = {}) {
   if (!tiles.length) return { ok: false, error: '타일을 선택하세요.' };
 
   const special = tiles.find(isColorless);
   if (special) {
+    if (opts.numbersOnly) return { ok: false, error: '이번에는 숫자 타일만 놓을 수 있습니다.' };
     if (tiles.length > 1) return { ok: false, error: '가위·쓰레기통은 한 개씩만 사용할 수 있습니다.' };
     if (!rowColor) return { ok: false, error: `${describeTile(special)}을(를) 사용할 줄을 고르세요.` };
     const row = rows.find((r) => r.color === rowColor);
     if (!row) return { ok: false, error: '없는 줄입니다.' };
-    if (row.tiles.length <= 1) return { ok: false, error: '1만 있는 줄에는 사용할 수 없습니다.' };
-    const label = special.k === 'scissors'
-      ? `✂ ${COLOR_NAMES[rowColor]} 줄의 ${describeTile(row.tiles[row.tiles.length - 1])} 제거`
-      : `🗑 ${COLOR_NAMES[rowColor]} 줄 비우기`;
-    return { ok: true, row: rowColor, kind: special.k, label };
+    if (row.tiles.length <= 1) return { ok: false, error: '1 타일만 있는 줄에는 사용할 수 없습니다.' };
+    if (special.k === 'scissors') {
+      const label = `✂ ${COLOR_NAMES[rowColor]} 줄의 ${describeTile(row.tiles[row.tiles.length - 1])} 제거`;
+      return { ok: true, row: rowColor, kind: 'scissors', count: 1, label };
+    }
+    const max = row.tiles.length - 1;
+    const count = opts.count == null ? max : Number(opts.count);
+    if (!Number.isInteger(count) || count < 1 || count > max) {
+      return { ok: false, error: `쓰레기통으로 제거할 개수는 1~${max}개입니다.` };
+    }
+    return { ok: true, row: rowColor, kind: 'trash', count, max, label: `🗑 ${COLOR_NAMES[rowColor]} 줄에서 ${count}개 제거` };
   }
 
   const color = tiles[0].c;
   if (tiles.some((t) => t.c !== color)) return { ok: false, error: '같은 색 타일만 함께 놓을 수 있습니다.' };
   if (rowColor && rowColor !== color) return { ok: false, error: '타일과 같은 색 줄에만 놓을 수 있습니다.' };
   const row = rows.find((r) => r.color === color);
-  if (rowClosed(row)) return { ok: false, error: `${COLOR_NAMES[color]} 줄은 END로 닫혔습니다.` };
+  if (!row.tiles.length) return { ok: false, error: `${COLOR_NAMES[color]} 1 타일이 없어 이 색은 놓을 수 없습니다.` };
+  if (rowClosed(row)) return { ok: false, error: `${COLOR_NAMES[color]} 줄은 16 END로 닫혔습니다.` };
 
   const seq = tiles.slice().sort((a, b) => a.n - b.n || KIND_ORDER[a.k] - KIND_ORDER[b.k]);
   for (let i = 1; i < seq.length; i++) {
@@ -134,16 +156,19 @@ export function validatePlay(rows, tiles, rowColor) {
   return { ok: true, row: color, kind: 'run', label, seq };
 }
 
-/** 가능한 모든 수 목록: [{ tileIds, row }] */
-export function legalMoves(rows, hand) {
+/**
+ * 가능한 모든 수 목록: [{ tileIds, row, count? }]
+ * opts.numbersOnly: 가위·쓰레기통 사용 후 추가로 놓는 차례 (숫자 타일만 가능)
+ */
+export function legalMoves(rows, hand, opts = {}) {
   const moves = [];
   for (const row of rows) {
-    if (rowClosed(row)) continue;
+    if (!row.tiles.length || rowClosed(row)) continue;
     const top = rowTop(row);
     const mine = hand.filter((t) => t.c === row.color && t.n > top);
     const byN = new Map();
     for (const t of mine) (byN.get(t.n) || byN.set(t.n, []).get(t.n)).push(t);
-    // 각 시작 타일에서 연속된 숫자로 늘려가며 모든 런을 만든다 (16은 RESTART/END 분기).
+    // 각 시작 타일에서 연속된 숫자로 늘려가며 모든 그룹을 만든다 (16은 RESTART/END 분기).
     const extend = (run) => {
       moves.push({ tileIds: run.map((t) => t.id), row: row.color });
       const last = run[run.length - 1];
@@ -152,20 +177,25 @@ export function legalMoves(rows, hand) {
     };
     for (const t of mine) extend([t]);
   }
+  if (opts.numbersOnly) return moves;
   const seen = new Set();
   for (const t of hand.filter(isColorless)) {
     if (seen.has(t.k)) continue;
     seen.add(t.k);
-    for (const row of rows) if (row.tiles.length > 1) moves.push({ tileIds: [t.id], row: row.color });
+    for (const row of rows) {
+      if (row.tiles.length <= 1) continue;
+      if (t.k === 'scissors') moves.push({ tileIds: [t.id], row: row.color });
+      else for (let count = 1; count < row.tiles.length; count++) moves.push({ tileIds: [t.id], row: row.color, count });
+    }
   }
   return moves;
 }
 
-export function hasLegalMove(rows, hand) {
+export function hasLegalMove(rows, hand, opts = {}) {
   for (const row of rows) {
-    if (!rowClosed(row) && hand.some((t) => t.c === row.color && t.n > rowTop(row))) return true;
+    if (row.tiles.length && !rowClosed(row) && hand.some((t) => t.c === row.color && t.n > rowTop(row))) return true;
   }
-  return hand.some(isColorless) && rows.some((r) => r.tiles.length > 1);
+  return !opts.numbersOnly && hand.some(isColorless) && rows.some((r) => r.tiles.length > 1);
 }
 
 export class SixteenGame {
@@ -185,16 +215,25 @@ export class SixteenGame {
     this.lastPlay = null;
     this.lastRound = null;
 
-    const deck = shuffle(createDeck(), this.rng);
+    const isOne = (t) => t.k === 'num' && t.n === 1;
+    let deck = shuffle(createDeck(), this.rng);
+    let tableOnes = [];
+    if (players.length === 2) {
+      // 2인: 숫자 1 타일 5개를 먼저 테이블에 꺼내 놓고 섞는다.
+      tableOnes = deck.filter(isOne);
+      deck = deck.filter((t) => !isOne(t));
+    }
     const size = HAND_SIZE[players.length];
     const hands = players.map(() => deck.splice(0, size));
-    const unused = deck;
+    this.unused = deck; // 남은 타일은 상자에 (사용하지 않음)
 
-    // 1 타일은 누가 받았든 모두 꺼내 줄을 시작한다.
-    const isOne = (t) => t.k === 'num' && t.n === 1;
-    const ones = [...hands.flat(), ...unused].filter(isOne);
-    this.rows = COLORS.map((c) => ({ color: c, tiles: [ones.find((t) => t.c === c)] }));
-    this.unused = unused.filter((t) => !isOne(t));
+    // 각자 가진 숫자 1 타일을 모두 테이블에 낸다.
+    const ones = [...tableOnes, ...hands.flat().filter(isOne)];
+    this.rows = COLORS.map((c) => {
+      const one = ones.find((t) => t.c === c);
+      return { color: c, tiles: one ? [one] : [] };
+    });
+    this.bonus = false;
 
     this.players = players.map((p, i) => ({
       id: p.id,
@@ -203,9 +242,14 @@ export class SixteenGame {
       hand: sortHand(hands[i].filter((t) => !isOne(t))),
       score: 0,
     }));
-    this.current = Math.floor(this.rng() * players.length);
+    const redOneSeat = players.length === 2 ? -1 : hands.findIndex((h) => h.some((t) => isOne(t) && t.c === 'red'));
+    this.current = redOneSeat >= 0 ? redOneSeat : Math.floor(this.rng() * players.length);
     this.phase = 'playing';
-    this.addLog(`게임 시작! 1 타일 5개로 줄을 만들었습니다. ${this.players[this.current].name}님부터 시작합니다.`);
+    const missing = this.rows.filter((r) => !r.tiles.length).map((r) => COLOR_NAMES[r.color]);
+    this.addLog(`게임 시작! 숫자 1 타일을 테이블에 냈습니다.${missing.length ? ` (${missing.join('·')} 1은 남은 타일에 있어 그 색은 놓을 수 없습니다)` : ''}`);
+    this.addLog(redOneSeat >= 0
+      ? `빨강 1을 낸 ${this.players[this.current].name}님부터 시작합니다.`
+      : `${this.players[this.current].name}님부터 시작합니다.`);
   }
 
   addLog(text) {
@@ -229,41 +273,58 @@ export class SixteenGame {
    * 타일을 놓는다.
    * @param {number[]} tileIds 놓을 타일 (숫자 런 또는 가위/쓰레기통 1개)
    * @param {string} [rowColor] 대상 줄 (가위/쓰레기통일 때 필수)
+   * @param {number} [count] 쓰레기통으로 제거할 개수 (기본: 1만 남기고 모두)
    */
-  play(id, tileIds, rowColor) {
+  play(id, tileIds, rowColor, count) {
     const p = this.assertTurn(id);
     if (!Array.isArray(tileIds) || tileIds.length === 0) throw new RuleError('타일을 선택하세요.');
     if (new Set(tileIds).size !== tileIds.length) throw new RuleError('같은 타일을 중복 선택했습니다.');
     const tiles = tileIds.map((tid) => p.hand.find((t) => t.id === tid));
     if (tiles.some((t) => !t)) throw new RuleError('손에 없는 타일입니다.');
 
-    const v = validatePlay(this.rows, tiles, rowColor);
+    const v = validatePlay(this.rows, tiles, rowColor, { numbersOnly: this.bonus, count });
     if (!v.ok) throw new RuleError(v.error);
     const row = this.rows.find((r) => r.color === v.row);
 
-    if (v.kind === 'scissors') {
-      this.discard.push(row.tiles.pop(), tiles[0]);
-    } else if (v.kind === 'trash') {
-      this.discard.push(...row.tiles.splice(1), tiles[0]);
-    } else {
+    if (v.kind === 'run') {
       row.tiles.push(...v.seq);
+    } else {
+      this.discard.push(...row.tiles.splice(row.tiles.length - v.count, v.count), tiles[0]);
     }
     p.hand = p.hand.filter((t) => !tileIds.includes(t.id));
     this.passes = 0;
     this.lastPlay = { by: this.current, row: v.row, kind: v.kind, tiles: v.kind === 'run' ? v.seq : tiles };
-    this.addLog(`${p.name}: ${v.label}`);
 
     if (p.hand.length === 0) {
+      this.addLog(`${p.name}: ${v.label}`);
       this.finish(this.current);
       return { kind: v.kind, finished: true };
     }
-    this.advance();
-    return { kind: v.kind, finished: false };
+    if (v.kind === 'run') {
+      this.addLog(`${p.name}: ${v.label}`);
+      this.bonus = false;
+      this.advance();
+    } else {
+      // 기능 타일을 쓰면 같은 사람이 숫자 타일을 한 번 더 놓을 수 있다.
+      this.addLog(`${p.name}: ${v.label} — 숫자 타일을 한 번 더 놓을 수 있습니다`);
+      this.bonus = true;
+      this.turnId += 1;
+    }
+    return { kind: v.kind, finished: false, bonus: this.bonus };
   }
 
   pass(id) {
     const p = this.assertTurn(id);
-    if (hasLegalMove(this.rows, p.hand)) throw new RuleError('놓을 수 있는 타일이 있으면 패스할 수 없습니다.');
+    if (hasLegalMove(this.rows, p.hand, { numbersOnly: this.bonus })) {
+      throw new RuleError('놓을 수 있는 타일이 있으면 패스할 수 없습니다.');
+    }
+    if (this.bonus) {
+      // 기능 타일을 쓴 뒤 추가로 놓을 숫자 타일이 없으면 차례만 넘긴다 (이번 차례에 이미 타일을 냈음).
+      this.bonus = false;
+      this.addLog(`${p.name}: 더 놓을 숫자 타일이 없어 차례를 넘깁니다`);
+      this.advance();
+      return {};
+    }
     this.passes += 1;
     this.addLog(`${p.name}: 패스 (놓을 수 있는 타일 없음)`);
     if (this.passes >= this.players.length) {
@@ -290,7 +351,7 @@ export class SixteenGame {
     this.phase = 'finished';
     this.addLog(emptiedSeat !== null
       ? `🏆 ${this.players[winner].name}님이 타일을 모두 내려놓고 승리했습니다!`
-      : `아무도 더 놓을 수 없습니다. 🏆 남은 숫자 합이 가장 적은 ${this.players[winner].name}님(${results[winner].penalty}점) 승리!`);
+      : `아무도 더 낼 수 없습니다. 🏆 남은 숫자 합이 가장 적은 ${this.players[winner].name}님(${results[winner].penalty}점) 승리!`);
     this.turnId += 1;
   }
 
@@ -309,6 +370,7 @@ export class SixteenGame {
       turnId: this.turnId,
       lastMoveAt: this.lastMoveAt || null,
       rows: this.rows.map((r) => ({ color: r.color, tiles: r.tiles, top: rowTop(r), closed: rowClosed(r) })),
+      bonus: !!this.bonus,
       discard: this.discard.length,
       unused: this.unused.length,
       passes: this.passes,
@@ -369,9 +431,11 @@ function evaluate(game, hand, move) {
   const sum = (ts) => ts.reduce((s, t) => s + tilePenalty(t), 0);
 
   if (isColorless(tiles[0])) {
-    const newTop = tiles[0].k === 'trash' ? 1 : rowTop({ tiles: row.tiles.slice(0, -1) });
-    const revived = sameColor.filter((t) => t.n > newTop && t.n <= top);
-    return 1 + sum(revived) * 0.8;
+    // 기능 타일은 남으면 20점이고 한 번 더 놓을 기회를 주므로 적극적으로 쓴다.
+    const count = move.count ?? 1;
+    const newTop = rowTop({ tiles: row.tiles.slice(0, row.tiles.length - count) });
+    const revived = sameColor.filter((t) => t.n > newTop && (row.tiles[row.tiles.length - 1].k === 'end' || t.n <= top));
+    return 14 + sum(revived) * 0.8 - count * 0.3;
   }
   const seq = tiles.slice().sort((a, b) => a.n - b.n);
   const first = seq[0].n;
@@ -386,12 +450,12 @@ function evaluate(game, hand, move) {
 
 export function botMove(game, id) {
   const p = game.players[game.seatOf(id)];
-  const moves = legalMoves(game.rows, p.hand);
+  const moves = legalMoves(game.rows, p.hand, { numbersOnly: !!game.bonus });
   if (!moves.length) return { action: 'pass' };
   let best = null;
   for (const m of moves) {
     const s = evaluate(game, p.hand, m) + game.rng() * 0.01;
     if (!best || s > best.s) best = { m, s };
   }
-  return { action: 'play', tileIds: best.m.tileIds, row: best.m.row };
+  return { action: 'play', tileIds: best.m.tileIds, row: best.m.row, count: best.m.count };
 }

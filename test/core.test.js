@@ -67,7 +67,7 @@ test('사람 1명 + 봇 3명으로 게임을 끝까지 진행한다', async () =
     const me = view.players[view.current];
     assert.equal(me.isBot, false, '봇 차례는 runBots 가 모두 처리해야 함');
     const hand = [...db.hands.values()].find((h) => h.userId === 'u1').tiles;
-    const moves = legalMoves(view.rows, hand);
+    const moves = legalMoves(view.rows, hand, { numbersOnly: view.bonus });
     if (moves.length) await call('u1', 'play', moves[0]);
     else await call('u1', 'pass');
   }
