@@ -59,6 +59,15 @@ create table public.messages (
 create index messages_room_idx on public.messages (room_code, id desc);
 
 -- ---------------------------------------------------------------------------
+-- 테이블 권한 (프로젝트의 "Automatically expose new tables" 설정과 무관하게 동작하도록 명시)
+-- 브라우저(anon/authenticated)는 읽기만, 쓰기는 service role(Edge Function)만.
+-- ---------------------------------------------------------------------------
+revoke all on public.rooms, public.games, public.game_secrets, public.hands, public.messages from anon, authenticated;
+grant select on public.rooms, public.games, public.hands, public.messages to anon, authenticated;
+grant all on public.rooms, public.games, public.game_secrets, public.hands, public.messages to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
+-- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------
 alter table public.rooms        enable row level security;
