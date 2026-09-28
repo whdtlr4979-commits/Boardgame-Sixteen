@@ -3,7 +3,7 @@
 //   npm run tiles            없는 파일만 새로 만든다 (직접 수정한 파일은 그대로 둠)
 //   npm run tiles -- --force 모든 파일을 이 스크립트의 디자인으로 다시 만든다 (수정한 내용이 덮어써짐!)
 //
-// 숫자(DM Serif Display)와 글자(Arimo)는 글꼴 파일에서 윤곽선(path)으로 변환해 넣으므로
+// 숫자(Old Standard TT Bold — 6·9 끝이 동그랗게 말리는 글꼴)와 글자(Arimo)는 글꼴 파일에서 윤곽선(path)으로 변환해 넣으므로
 // 어느 기기에서나 똑같이 보인다. 글꼴: SIL Open Font License (@fontsource 패키지).
 //
 // 파일 이름 규칙 (게임이 이 이름으로 불러온다)
@@ -34,7 +34,7 @@ const loadFont = async (pkg, file) => {
   const buf = await readFile(new URL(`../node_modules/@fontsource/${pkg}/files/${file}`, import.meta.url));
   return opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
 };
-const SERIF = await loadFont('dm-serif-display', 'dm-serif-display-latin-400-normal.woff');
+const SERIF = await loadFont('old-standard-tt', 'old-standard-tt-latin-700-normal.woff');
 const SANS = await loadFont('arimo', 'arimo-latin-700-normal.woff');
 
 // 타일 크기: 가로 100, 세로 104 (흰 정사각 윗면 + 아래·오른쪽 그림자)
@@ -68,6 +68,9 @@ function bbox(commands) {
  * 글자를 윤곽선 path 로 변환한다.
  * height: 숫자(또는 대문자) 높이, cx: 가운데 x, cy: 글자 세로 가운데, maxW: 최대 너비
  */
+// 두 자리 숫자는 글꼴 기본 간격이 넓어서 조금 좁힌다
+const TIGHT = -0.09;
+
 function textPath(font, text, { height, cx, cy, maxW = 90, spacing = 0, ref = '8' }) {
   const probe = bbox(glyphRun(font, ref, 0, 0, 100));
   let size = (100 * height) / (probe.y2 - probe.y1);
@@ -123,7 +126,7 @@ function numberTile(c, n) {
     parts.push(pathEl(textPath(SERIF, String(n), { height: 56, cx: 49, cy: 44 }), color));
     parts.push(`  <circle cx="49" cy="83" r="4.2" fill="${color}"/>`);
   } else {
-    parts.push(pathEl(textPath(SERIF, String(n), { height: 60, cx: 49, cy: 48, maxW: 82 }), color));
+    parts.push(pathEl(textPath(SERIF, String(n), { height: 60, cx: 49, cy: 48, maxW: 82, spacing: n >= 10 ? TIGHT : 0 }), color));
   }
   return tile(`${NAMES[c]} ${n}`, parts.join('\n'));
 }
@@ -131,7 +134,7 @@ function numberTile(c, n) {
 function endTile(c) {
   const color = COLORS[c];
   return tile(`${NAMES[c]} 16 END`, [
-    pathEl(textPath(SERIF, '16', { height: 52, cx: 49, cy: 40, maxW: 82 }), color),
+    pathEl(textPath(SERIF, '16', { height: 52, cx: 49, cy: 40, maxW: 82, spacing: TIGHT }), color),
     labelEl(textPath(SANS, 'END', { height: 10, cx: 49, cy: 78, maxW: 60, ref: 'E' }), color),
   ].join('\n'));
 }
@@ -153,7 +156,7 @@ function restartTile(c) {
   </g>`;
   return tile(`${NAMES[c]} 16 RESTART`, [
     loop,
-    pathEl(textPath(SERIF, '16', { height: 38, cx: 49, cy: 42, maxW: 52 }), color),
+    pathEl(textPath(SERIF, '16', { height: 38, cx: 49, cy: 42, maxW: 52, spacing: TIGHT }), color),
     labelEl(textPath(SANS, 'RESTART', { height: 8, cx: 49, cy: 70, maxW: 58, ref: 'R' }), color, 0.7),
   ].join('\n'));
 }
@@ -197,7 +200,7 @@ function backTile() {
       <stop offset="0.6" stop-color="#d62976"/>
       <stop offset="1" stop-color="#4f5bd5"/>
     </linearGradient>`;
-  return tile('가려진 타일', pathEl(textPath(SERIF, '16', { height: 40, cx: 49, cy: 49, maxW: 70 }), 'rgba(255,255,255,0.92)'),
+  return tile('가려진 타일', pathEl(textPath(SERIF, '16', { height: 40, cx: 49, cy: 49, maxW: 70, spacing: TIGHT }), 'rgba(255,255,255,0.92)'),
     { face: 'url(#back)', stroke: 'none', defs });
 }
 
