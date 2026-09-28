@@ -1,22 +1,24 @@
-(function () {
-'use strict';
-
 /**
  * 식스틴(Sixteen) 게임 엔진 — 네트워크와 무관한 순수 로직.
+ * 브라우저(public/game.js)와 Supabase Edge Function이 같은 코드를 사용한다.
+ * public/game.js는 `npm run sync` 로 이 파일을 복사한 것이다.
  *
  * 구성물: 5가지 색 × 숫자 1~16 타일 80개 + 조커 8개 = 총 88개
  * 목표: 손패를 먼저 모두 내려놓고, 라운드가 끝났을 때 남은 숫자의 합을 최소화한다.
  */
 
-const COLORS = ['red', 'yellow', 'green', 'blue', 'purple'];
-const MAX_NUMBER = 16;
+/** 규칙 위반 — 메시지를 그대로 사용자에게 보여줘도 되는 오류. */
+export class RuleError extends Error {}
+
+export const COLORS = ['red', 'yellow', 'green', 'blue', 'purple'];
+export const MAX_NUMBER = 16;
 const JOKER_COUNT = 8;
-const JOKER_PENALTY = 20;
-const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 5;
+export const JOKER_PENALTY = 20;
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 5;
 const MIN_RUN = 3;
 
-function createDeck() {
+export function createDeck() {
   const deck = [];
   let id = 0;
   for (const c of COLORS) {
@@ -36,7 +38,7 @@ function shuffle(arr, rng = Math.random) {
 }
 
 /** 손패 정렬: 숫자 오름차순, 같은 숫자는 색 순서, 조커는 맨 뒤. */
-function sortHand(hand) {
+export function sortHand(hand) {
   const key = (t) => (t.n === 0 ? 1000 : t.n * 10 + COLORS.indexOf(t.c));
   return hand.slice().sort((a, b) => key(a) - key(b));
 }
@@ -56,7 +58,7 @@ function tilePenalty(t) {
  *  - run:    연속된 숫자 3개 이상 (색 무관, 숫자 중복 불가)
  * 조커는 어떤 숫자로도 쓸 수 있다. value는 비교 기준(세트=숫자, 런=가장 높은 숫자).
  */
-function interpret(tiles) {
+export function interpret(tiles) {
   const k = tiles.length;
   if (k === 0) return [];
   const nums = tiles.filter((t) => t.n > 0).map((t) => t.n);
@@ -88,34 +90,34 @@ function interpret(tiles) {
   return out;
 }
 
-function beats(combo, table) {
+export function beats(combo, table) {
   if (!table) return true;
   return combo.type === table.type && combo.size === table.size && combo.value > table.value;
 }
 
 /** 테이블을 이길 수 있는 가장 좋은 해석을 고른다. (선이면 가장 강한 해석) */
-function chooseInterpretation(tiles, table) {
+export function chooseInterpretation(tiles, table) {
   const options = interpret(tiles).filter((c) => beats(c, table));
   if (!options.length) return null;
   options.sort((a, b) => b.value - a.value || (a.type === 'run' ? -1 : 1));
   return options[0];
 }
 
-function describeCombo(combo) {
+export function describeCombo(combo) {
   if (!combo) return '';
   if (combo.type === 'single') return `싱글 ${combo.value}`;
   if (combo.type === 'set') return `${combo.value} × ${combo.size} 세트`;
   return `${combo.value - combo.size + 1}–${combo.value} 런`;
 }
 
-class SixteenGame {
+export class SixteenGame {
   /**
    * @param {{id:string,name:string,isBot?:boolean}[]} players 좌석 순서
    * @param {{rounds?:number, rng?:()=>number}} opts
    */
   constructor(players, opts = {}) {
     if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
-      throw new Error(`플레이어 수는 ${MIN_PLAYERS}~${MAX_PLAYERS}명이어야 합니다.`);
+      throw new RuleError(`플레이어 수는 ${MIN_PLAYERS}~${MAX_PLAYERS}명이어야 합니다.`);
     }
     this.rng = opts.rng || Math.random;
     this.maxRounds = opts.rounds || 3;
@@ -162,25 +164,25 @@ class SixteenGame {
   }
 
   assertTurn(id) {
-    if (this.phase !== 'playing') throw new Error('지금은 진행 중인 라운드가 없습니다.');
+    if (this.phase !== 'playing') throw new RuleError('지금은 진행 중인 라운드가 없습니다.');
     const seat = this.seatOf(id);
-    if (seat < 0) throw new Error('이 게임의 플레이어가 아닙니다.');
-    if (seat !== this.current) throw new Error('당신의 차례가 아닙니다.');
+    if (seat < 0) throw new RuleError('이 게임의 플레이어가 아닙니다.');
+    if (seat !== this.current) throw new RuleError('당신의 차례가 아닙니다.');
     return this.players[seat];
   }
 
   play(id, tileIds) {
     const p = this.assertTurn(id);
-    if (!Array.isArray(tileIds) || tileIds.length === 0) throw new Error('타일을 선택하세요.');
-    if (new Set(tileIds).size !== tileIds.length) throw new Error('같은 타일을 중복 선택했습니다.');
+    if (!Array.isArray(tileIds) || tileIds.length === 0) throw new RuleError('타일을 선택하세요.');
+    if (new Set(tileIds).size !== tileIds.length) throw new RuleError('같은 타일을 중복 선택했습니다.');
     const tiles = tileIds.map((tid) => p.hand.find((t) => t.id === tid));
-    if (tiles.some((t) => !t)) throw new Error('손에 없는 타일입니다.');
+    if (tiles.some((t) => !t)) throw new RuleError('손에 없는 타일입니다.');
 
     const tableCombo = this.table ? this.table.combo : null;
     const combo = chooseInterpretation(tiles, tableCombo);
     if (!combo) {
-      if (!interpret(tiles).length) throw new Error('올바른 조합이 아닙니다. (싱글 / 같은 숫자 세트 / 3개 이상 연속 런)');
-      throw new Error(`${describeCombo(tableCombo)}보다 높은 같은 형태의 조합을 내야 합니다.`);
+      if (!interpret(tiles).length) throw new RuleError('올바른 조합이 아닙니다. (싱글 / 같은 숫자 세트 / 3개 이상 연속 런)');
+      throw new RuleError(`${describeCombo(tableCombo)}보다 높은 같은 형태의 조합을 내야 합니다.`);
     }
 
     p.hand = p.hand.filter((t) => !tileIds.includes(t.id));
@@ -198,7 +200,7 @@ class SixteenGame {
 
   pass(id) {
     const p = this.assertTurn(id);
-    if (!this.table) throw new Error('선 플레이어는 패스할 수 없습니다. 타일을 내려놓으세요.');
+    if (!this.table) throw new RuleError('선 플레이어는 패스할 수 없습니다. 타일을 내려놓으세요.');
     let drew = null;
     if (this.drawPile.length) {
       drew = this.drawPile.pop();
@@ -245,7 +247,7 @@ class SixteenGame {
   }
 
   nextRound() {
-    if (this.phase !== 'roundEnd') throw new Error('다음 라운드를 시작할 수 없습니다.');
+    if (this.phase !== 'roundEnd') throw new RuleError('다음 라운드를 시작할 수 없습니다.');
     this.startRound();
   }
 
@@ -255,14 +257,15 @@ class SixteenGame {
       .sort((a, b) => a.score - b.score);
   }
 
-  /** 특정 플레이어에게 보여줄 상태 (다른 사람의 손패는 가린다 — 가림막). */
-  viewFor(id) {
+  /** 모든 사람에게 공개되는 상태 (손패는 개수만 — 가림막). */
+  publicView() {
     return {
       phase: this.phase,
       round: this.round,
       maxRounds: this.maxRounds,
       current: this.current,
       turnId: this.turnId,
+      lastMoveAt: this.lastMoveAt || null,
       drawPile: this.drawPile.length,
       table: this.table && {
         combo: this.table.combo,
@@ -279,11 +282,37 @@ class SixteenGame {
         score: p.score,
         roundScores: p.roundScores,
       })),
-      hand: (this.players.find((p) => p.id === id) || { hand: null }).hand,
       lastRound: this.lastRound,
       standings: this.phase === 'finished' ? this.standings() : null,
       log: this.log.slice(-30),
     };
+  }
+
+  /** 특정 플레이어에게 보여줄 상태: 공개 상태 + 자기 손패. */
+  viewFor(id) {
+    const me = this.players.find((p) => p.id === id);
+    return { ...this.publicView(), hand: me ? me.hand : null };
+  }
+
+  /** 자리 주인을 봇 ↔ 사람으로 바꾼다 (나간 플레이어 대체, 재접속 시 복귀). */
+  setBot(id, isBot, name) {
+    const p = this.players.find((x) => x.id === id);
+    if (!p) return;
+    p.isBot = isBot;
+    if (name) p.name = name;
+  }
+
+  /** DB에 저장할 수 있는 순수 JSON (rng 함수 제외). */
+  toJSON() {
+    const { rng, ...rest } = this;
+    return JSON.parse(JSON.stringify(rest));
+  }
+
+  static fromJSON(data, rng = Math.random) {
+    const g = Object.create(SixteenGame.prototype);
+    Object.assign(g, JSON.parse(JSON.stringify(data)));
+    g.rng = rng;
+    return g;
   }
 }
 
@@ -329,7 +358,7 @@ function* combinations(hand, table) {
   }
 }
 
-function botMove(game, id) {
+export function botMove(game, id) {
   const p = game.players[game.seatOf(id)];
   const tableCombo = game.table ? game.table.combo : null;
   let best = null;
@@ -347,23 +376,3 @@ function botMove(game, id) {
   return { action: 'pass' };
 }
 
-const api = {
-  COLORS,
-  MAX_NUMBER,
-  MIN_PLAYERS,
-  MAX_PLAYERS,
-  JOKER_PENALTY,
-  createDeck,
-  sortHand,
-  interpret,
-  beats,
-  chooseInterpretation,
-  describeCombo,
-  SixteenGame,
-  botMove,
-};
-
-// Node(서버)와 브라우저(클라이언트) 양쪽에서 같은 규칙 코드를 사용한다.
-if (typeof module !== 'undefined' && module.exports) module.exports = api;
-else globalThis.Sixteen = api;
-})();
