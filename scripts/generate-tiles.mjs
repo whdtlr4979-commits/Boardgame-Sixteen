@@ -148,18 +148,18 @@ function endTile(c) {
 
 function restartTile(c) {
   const color = COLORS[c];
-  // 16 둘레를 반시계 방향으로 도는 화살표 4개
-  const loop = `  <g fill="none" stroke="${color}" stroke-width="7" stroke-linejoin="round">
-    <path d="M85 45 V21 a8 8 0 0 0 -8 -8 H41"/>
-    <path d="M27 13 H21 a8 8 0 0 0 -8 8 V37"/>
-    <path d="M13 54 V77 a8 8 0 0 0 8 8 H57"/>
-    <path d="M71 85 H77 a8 8 0 0 0 8 -8 V61"/>
+  // 16 둘레를 반시계 방향으로 도는 화살표 4개 (둥글고 통통한 스타일)
+  const loop = `  <g fill="none" stroke="${color}" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M84 44 V26 a12 12 0 0 0 -12 -12 H44"/>
+    <path d="M28 14 H26 a12 12 0 0 0 -12 12 V36"/>
+    <path d="M14 56 V72 a12 12 0 0 0 12 12 H54"/>
+    <path d="M70 84 H72 a12 12 0 0 0 12 -12 V62"/>
   </g>
-  <g fill="${color}">
-    <path d="M42 3 L42 23 L28 13 Z"/>
-    <path d="M3 36 L23 36 L13 50 Z"/>
-    <path d="M56 75 L56 95 L70 85 Z"/>
-    <path d="M75 62 L95 62 L85 48 Z"/>
+  <g fill="${color}" stroke="${color}" stroke-width="4.5" stroke-linejoin="round">
+    <path d="M44 5.5 L44 22.5 L32 14 Z"/>
+    <path d="M5.5 36 L22.5 36 L14 48 Z"/>
+    <path d="M54 75.5 L54 92.5 L66 84 Z"/>
+    <path d="M75.5 62 L92.5 62 L84 50 Z"/>
   </g>`;
   return tile(`${NAMES[c]} 16 RESTART`, [
     loop,
@@ -169,34 +169,32 @@ function restartTile(c) {
   ].join('\n'));
 }
 
+const INK = '#2a2a2a';
+
 function scissorsTile() {
-  return tile('가위', `  <g fill="#141414">
-    <!-- 날 (위 손잡이 → 아래쪽 날, 아래 손잡이 → 위쪽 날) -->
-    <path d="M28 40 L38 41.5 L51 47.5 L96 57 L93.5 61 L49 55 L31 47.5 Z"/>
-    <path d="M28 60 L38 58.5 L51 52.5 L96 43 L93.5 39 L49 45 L31 52.5 Z"/>
+  // 통통한 고리 손잡이 + 끝이 둥근 날 (두 날은 y=50 에서 교차)
+  return tile('가위', `  <g fill="none" stroke="${INK}" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M35 41 L87 63" stroke-width="9"/>
+    <path d="M35 59 L87 37" stroke-width="9"/>
+    <circle cx="25" cy="34" r="10.5" stroke-width="8"/>
+    <circle cx="25" cy="66" r="10.5" stroke-width="8"/>
   </g>
-  <g fill="none" stroke="#141414" stroke-width="5.5">
-    <!-- 손잡이 -->
-    <ellipse cx="20" cy="36" rx="9.5" ry="8.5"/>
-    <ellipse cx="20" cy="64" rx="9.5" ry="8.5"/>
-  </g>
-  <circle cx="50" cy="50" r="1.8" fill="#fff"/>`);
+  <circle cx="55.9" cy="50" r="3.2" fill="#fff"/>`);
 }
 
 function trashTile() {
-  return tile('쓰레기통', `  <g fill="#141414">
-    <!-- 뚜껑 -->
-    <g transform="rotate(-4 49 20)">
-      <rect x="42" y="10" width="14" height="6" rx="1.5"/>
-      <rect x="19" y="16" width="61" height="8" rx="2"/>
+  // 살짝 기울어진 둥근 뚜껑 + 둥근 통 + 흰 줄 3개
+  return tile('쓰레기통', `  <g fill="${INK}" stroke="${INK}" stroke-width="3" stroke-linejoin="round">
+    <g transform="rotate(-8 50 22)">
+      <rect x="40" y="9" width="20" height="9" rx="4.5"/>
+      <rect x="19" y="17" width="62" height="11" rx="5.5"/>
     </g>
-    <!-- 통 -->
-    <path d="M24 30 H74 L69 86 a5 5 0 0 1 -5 4.5 H34 a5 5 0 0 1 -5 -4.5 Z"/>
+    <path d="M25 34 H75 L70.5 84 Q70 91 63 91 H37 Q30 91 29.5 84 Z"/>
   </g>
-  <g fill="#fff">
-    <rect x="34" y="38" width="7" height="44" rx="3.5"/>
-    <rect x="45.5" y="38" width="7" height="44" rx="3.5"/>
-    <rect x="57" y="38" width="7" height="44" rx="3.5"/>
+  <g stroke="#fff" stroke-width="5.5" stroke-linecap="round">
+    <path d="M38.5 45 L39.5 79"/>
+    <path d="M50 45 V79"/>
+    <path d="M61.5 45 L60.5 79"/>
   </g>`);
 }
 

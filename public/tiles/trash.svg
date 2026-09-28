@@ -7,18 +7,16 @@
   <rect x="4" y="6" width="95" height="95" rx="16" fill="#000" opacity="0.18" filter="url(#soft)"/>
   <!-- 타일 윗면 -->
   <rect x="1.5" y="1.5" width="95" height="95" rx="16" fill="#ffffff" stroke="#e6e6e6" stroke-width="1.2"/>
-  <g fill="#141414">
-    <!-- 뚜껑 -->
-    <g transform="rotate(-4 49 20)">
-      <rect x="42" y="10" width="14" height="6" rx="1.5"/>
-      <rect x="19" y="16" width="61" height="8" rx="2"/>
+  <g fill="#2a2a2a" stroke="#2a2a2a" stroke-width="3" stroke-linejoin="round">
+    <g transform="rotate(-8 50 22)">
+      <rect x="40" y="9" width="20" height="9" rx="4.5"/>
+      <rect x="19" y="17" width="62" height="11" rx="5.5"/>
     </g>
-    <!-- 통 -->
-    <path d="M24 30 H74 L69 86 a5 5 0 0 1 -5 4.5 H34 a5 5 0 0 1 -5 -4.5 Z"/>
+    <path d="M25 34 H75 L70.5 84 Q70 91 63 91 H37 Q30 91 29.5 84 Z"/>
   </g>
-  <g fill="#fff">
-    <rect x="34" y="38" width="7" height="44" rx="3.5"/>
-    <rect x="45.5" y="38" width="7" height="44" rx="3.5"/>
-    <rect x="57" y="38" width="7" height="44" rx="3.5"/>
+  <g stroke="#fff" stroke-width="5.5" stroke-linecap="round">
+    <path d="M38.5 45 L39.5 79"/>
+    <path d="M50 45 V79"/>
+    <path d="M61.5 45 L60.5 79"/>
   </g>
 </svg>
