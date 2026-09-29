@@ -278,7 +278,7 @@ import { createNet } from './net.js';
     await emit('addBot');
     await emit('addBot');
     await emit('addBot');
-    await emit('start');
+    // 게임은 대기실에서 '게임 시작'을 눌러 시작한다
     go('game');
   }
 
@@ -578,6 +578,8 @@ import { createNet } from './net.js';
     const me = mySeat();
     const myTurn = g.phase === 'playing' && g.current === me;
     $('#board').classList.toggle('not-turn', !myTurn);
+    $('#board').classList.toggle('my-turn', myTurn);
+    $('#board').classList.toggle('playing', g.phase === 'playing');
 
     // 다른 플레이어를 테이블 둘레(북·서·동)에 앉힌다. 나는 남쪽, 차례는 시계 방향(서 → 북 → 동).
     const order = g.players.map((p, i) => ({ ...p, seat: i }));
@@ -597,7 +599,7 @@ import { createNet } from './net.js';
       return `
         <div class="seat-card ${turn ? 'turn' : ''}" data-pid="${esc(p.id)}">
           <span class="avatar ring ${p.isBot ? 'bot' : ''}">${esc(memberAvatar(p.id))}<span class="online-dot ${online ? '' : 'off'}"></span></span>
-          <div class="meta"><strong>${esc(p.name)}</strong><span>타일 ${p.count}개${g.phase === 'finished' ? ` · ${p.score}점` : ''}</span>${turn ? `<span class="turn-tag">${p.isBot ? '생각 중…' : '차례'}</span>` : ''}</div>
+          <div class="meta"><strong>${esc(p.name)}</strong><span>타일 ${p.count}개${g.phase === 'finished' ? ` · ${p.score}점` : ''}</span></div>${turn ? `<span class="turn-tag">${p.isBot ? '🤖' : '▶'}<span class="tag-text"> ${p.isBot ? '생각 중…' : '차례'}</span></span>` : ''}
           ${stalled ? `<button class="btn sm" data-replace="${esc(p.id)}" title="응답이 없는 플레이어를 봇으로 대체">🤖 봇으로 대체</button>` : `<div class="seat-backs">${backs}</div>`}
         </div>`;
     };
