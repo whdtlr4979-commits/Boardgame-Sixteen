@@ -223,11 +223,29 @@ export function createNet(config, handlers) {
   }
 
   function exitRoom() {
+    const left = roomCode;
     if (roomChannel) sb.removeChannel(roomChannel);
     roomChannel = null;
     roomCode = null;
     roomState = null;
+    if (left) forgetMembership(left);
     trackPresence();
+  }
+
+  /**
+   * 서버 변경이 실시간으로 도착하기 전에 로비 목록에서 내 자리를 먼저 뺀다.
+   * (그러지 않으면 방금 나간 방이 로비에 잠깐 보였다가 사라진다)
+   */
+  function forgetMembership(code) {
+    lobbyRooms = lobbyRooms.flatMap((r) => {
+      if (r.code !== code) return [r];
+      // 게임 중에 나가면 봇이 내 자리를 대신하고, 대기 중이면 자리가 빠진다
+      const members = r.status === 'playing'
+        ? r.members.map((m) => (m.userId === userId ? { ...m, userId: null, isBot: true } : m))
+        : r.members.filter((m) => m.userId !== userId);
+      return members.some((m) => !m.isBot) ? [{ ...r, members }] : [];
+    });
+    emitLobby();
   }
 
   function emitRoom() {
