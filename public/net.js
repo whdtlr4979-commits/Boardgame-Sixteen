@@ -134,14 +134,14 @@ export function createNet(config, handlers) {
         emitLobby();
         if (roomState) emitRoom();
       })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') await trackPresence();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') trackPresence();
       });
   }
 
-  async function trackPresence() {
+  function trackPresence() {
     if (!presenceChannel || !profile) return;
-    await presenceChannel.track({ name: profile.name, avatar: profile.avatar, room: roomCode });
+    presenceChannel.track({ name: profile.name, avatar: profile.avatar, room: roomCode }).catch(() => {});
   }
 
   const isOnline = (uid) => presence.some((p) => p.userId === uid);
@@ -180,7 +180,8 @@ export function createNet(config, handlers) {
         // (재)연결될 때마다 최신 상태를 다시 읽어 놓친 변경을 보정한다.
         if (status === 'SUBSCRIBED') loadRoom(code);
       });
-    await trackPresence();
+    // 접속 상태 갱신은 응답이 몇 초씩 늦을 때가 있어 기다리지 않는다 (기다리면 방 입장·봇 추가가 멈춘다)
+    trackPresence();
     await loadRoom(code);
   }
 
@@ -287,9 +288,9 @@ export function createNet(config, handlers) {
     return userId;
   }
 
-  async function setProfile(p) {
+  function setProfile(p) {
     profile = p;
-    await trackPresence();
+    trackPresence();
   }
 
   return { start, call, setProfile, refreshLobby, get userId() { return userId; }, get roomCode() { return roomCode; } };
