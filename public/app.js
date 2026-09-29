@@ -30,6 +30,7 @@ import { createNet } from './net.js';
     flyFrom: null,          // 내가 낸 타일의 출발 위치 (손패에서)
     sentIds: new Set(),     // 서버 응답을 기다리는 동안 손패에서 숨길 타일
     inFlight: new Set(),    // 날아오는 중이라 테이블에서 아직 숨겨 둘 타일
+    opt: null,              // 서버 응답 전에 먼저 날려 보낸 내 타일
   };
 
   /* ---------------- 테마 ---------------- */
@@ -731,9 +732,15 @@ import { createNet } from './net.js';
       state.sentIds.add(t.id);
     }
     state.flyFrom = { t: Date.now(), rects };
+    // 서버 응답을 기다리지 않고 바로 날아가기 시작한다 (응답이 오면 그 자리에 내려앉는다)
+    const opt = startOptimistic(v.kind === 'run' ? v.seq : tiles, v, rects);
     const res = await emit('play', { tileIds: tiles.map((t) => t.id), row: v.row, count });
-    if (res.ok) state.selected.clear();
-    else {
+    if (res.ok) {
+      state.selected.clear();
+      // 혹시 실시간 업데이트가 오지 않으면 떠 있는 타일을 치운다
+      if (opt) setTimeout(() => { if (state.opt === opt) cancelOptimistic(); }, 8000);
+    } else {
+      if (state.opt === opt) cancelOptimistic();
       for (const t of tiles) state.sentIds.delete(t.id);
       state.flyFrom = null;
       renderBoard();
@@ -746,6 +753,12 @@ import { createNet } from './net.js';
   function prepareAnim(prevG, g) {
     const lp = g.lastPlay;
     const player = g.players[lp.by];
+    const opt = state.opt;
+    if (opt && player && player.id === state.room.you && opt.row === lp.row && opt.key === lp.tiles.map((t) => t.id).join(',')) {
+      state.opt = null;
+      state.flyFrom = null;
+      return { lp, opt, removed: removedTiles(prevG, g) };
+    }
     let origins = null;
     if (player && player.id === state.room.you && state.flyFrom && Date.now() - state.flyFrom.t < 10000) {
       origins = lp.tiles.map((t) => state.flyFrom.rects[t.id] || null);
@@ -757,18 +770,69 @@ import { createNet } from './net.js';
       const r = (seat || $('#handAvatar')).getBoundingClientRect();
       origins = lp.tiles.map(() => ({ left: r.left + r.width / 2, top: r.top + r.height / 2, width: 0, height: 0 }));
     }
-    let removed = [];
-    if (lp.kind !== 'run') {
-      const prevRow = prevG.rows.find((r) => r.color === lp.row);
-      const newRow = g.rows.find((r) => r.color === lp.row);
-      const n = prevRow && newRow ? prevRow.tiles.length - newRow.tiles.length : 0;
-      if (n > 0) {
-        removed = $$(`#rows .row[data-row="${lp.row}"] .row-tiles .tile`).slice(-n)
-          .map((el) => ({ html: el.outerHTML, rect: el.getBoundingClientRect() }));
-      }
-    }
-    return { lp, origins, removed };
+    return { lp, origins, removed: removedTiles(prevG, g) };
   }
+
+  /** 가위·쓰레기통으로 줄에서 사라질 타일의 모양과 위치 (다시 그리기 전에 읽는다) */
+  function removedTiles(prevG, g) {
+    const lp = g.lastPlay;
+    if (lp.kind === 'run') return [];
+    const prevRow = prevG.rows.find((r) => r.color === lp.row);
+    const newRow = g.rows.find((r) => r.color === lp.row);
+    const n = prevRow && newRow ? prevRow.tiles.length - newRow.tiles.length : 0;
+    if (n <= 0) return [];
+    return $$(`#rows .row[data-row="${lp.row}"] .row-tiles .tile:not(.opt-slot)`).slice(-n)
+      .map((el) => ({ html: el.outerHTML, rect: el.getBoundingClientRect() }));
+  }
+
+  /** 가위·쓰레기통이 날아가 멈출 자리: 줄 마지막 타일 바로 위 */
+  function specialTarget(rowEl, lastRect) {
+    const w = rowEl.querySelector('.row-tiles .tile')?.getBoundingClientRect().width || 40;
+    const last = lastRect || $('.row-tiles', rowEl).getBoundingClientRect();
+    return { left: last.left + (lastRect ? 0 : 8), top: last.top - (lastRect ? w * 0.6 : 0), width: w, height: w * 1.04 };
+  }
+
+  /** 내가 낸 타일을 서버 응답 전에 바로 줄 끝으로 날려 보낸다. */
+  function startOptimistic(tiles, v, rects) {
+    cancelOptimistic();
+    const rowEl = $(`#rows .row[data-row="${v.row}"]`);
+    const box = rowEl && $('.row-tiles', rowEl);
+    if (!box || tiles.some((t) => !rects[t.id])) return null;
+    let targets;
+    if (v.kind === 'run') {
+      // 줄 끝에 보이지 않는 자리를 만들어 도착 위치를 잰다
+      const slots = tiles.map((t) => {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = tileHTML(t, 'md incoming opt-slot');
+        const el = wrap.firstElementChild;
+        el.removeAttribute('data-id');
+        box.append(el);
+        return el;
+      });
+      box.scrollLeft = box.scrollWidth;
+      targets = slots.map((el) => el.getBoundingClientRect());
+    } else {
+      const last = $$('.row-tiles .tile', rowEl).pop();
+      targets = [specialTarget(rowEl, last?.getBoundingClientRect())];
+    }
+    const items = tiles.map((tile, i) => ({ tile, target: targets[i], ...flyTile(tile, rects[tile.id], targets[i], i * 90) }));
+    state.opt = { key: tiles.map((t) => t.id).join(','), row: v.row, kind: v.kind, items };
+    return state.opt;
+  }
+
+  /** 서버가 거절했을 때: 날아간 타일을 치운다. */
+  function cancelOptimistic() {
+    const opt = state.opt;
+    state.opt = null;
+    $$('#rows .opt-slot').forEach((el) => el.remove());
+    if (!opt) return;
+    for (const { node } of opt.items) {
+      node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: 'forwards' }).onfinish = () => node.remove();
+    }
+  }
+
+  /** 애니메이션이 끝나면(이미 끝났으면 바로) fn 을 실행한다 */
+  const afterAnim = (anim, fn) => (anim.playState === 'finished' ? fn() : anim.finished.then(fn, fn));
 
   function makeFloating(html, width) {
     const wrap = document.createElement('div');
@@ -798,9 +862,13 @@ import { createNet } from './net.js';
     return { node, anim };
   }
 
-  function runAnim({ lp, origins, removed }) {
+  function runAnim({ lp, origins, removed, opt }) {
     const rowEl = $(`#rows .row[data-row="${lp.row}"]`);
-    if (!rowEl) return;
+    if (!rowEl) {
+      opt?.items.forEach(({ node }) => node.remove());
+      return;
+    }
+    if (opt) return landOptimistic(rowEl, lp, opt, removed);
     const STAGGER = 110;
 
     if (lp.kind === 'run') {
@@ -835,25 +903,65 @@ import { createNet } from './net.js';
       node.style.visibility = '';
       return { node, rect };
     });
-    const last = ghosts.length ? ghosts[ghosts.length - 1].rect : $('.row-tiles', rowEl).getBoundingClientRect();
-    const w = rowEl.querySelector('.row-tiles .tile')?.getBoundingClientRect().width || 40;
-    const target = { left: last.left + (ghosts.length ? 0 : 8), top: last.top - (ghosts.length ? w * 0.6 : 0), width: w, height: w * 1.04 };
+    const target = specialTarget(rowEl, ghosts.length ? ghosts[ghosts.length - 1].rect : null);
     const { node: tool, anim } = flyTile(lp.tiles[0], origins[0], target, 0);
-    anim.onfinish = () => {
-      tool.animate([
-        { transform: `translate(${target.left}px, ${target.top}px) scale(1)`, opacity: 1 },
-        { transform: `translate(${target.left - w * 0.2}px, ${target.top - w * 0.2}px) scale(1.4)`, opacity: 0 },
-      ], { duration: 380, easing: 'ease-out', fill: 'both' }).onfinish = () => tool.remove();
-      ghosts.reverse().forEach(({ node, rect }, i) => {
-        const dir = i % 2 ? 1 : -1;
-        node.animate([
-          { transform: `translate(${rect.left}px, ${rect.top}px) rotate(0deg)`, opacity: 1 },
-          { transform: `translate(${rect.left + dir * 24}px, ${rect.top - 46}px) rotate(${dir * 24}deg) scale(.8)`, opacity: 0 },
-        ], { duration: 460, delay: i * 70, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'both' }).onfinish = () => node.remove();
+    anim.onfinish = () => specialImpact(rowEl, tool, target, ghosts);
+  }
+
+  /** 가위·쓰레기통이 줄 끝에 닿는 순간: 도구는 사라지고 제거된 타일이 튕겨 나간다 */
+  function specialImpact(rowEl, tool, target, ghosts) {
+    const w = target.width;
+    tool.animate([
+      { transform: `translate(${target.left}px, ${target.top}px) scale(1)`, opacity: 1 },
+      { transform: `translate(${target.left - w * 0.2}px, ${target.top - w * 0.2}px) scale(1.4)`, opacity: 0 },
+    ], { duration: 380, easing: 'ease-out', fill: 'both' }).onfinish = () => tool.remove();
+    ghosts.reverse().forEach(({ node, rect }, i) => {
+      const dir = i % 2 ? 1 : -1;
+      node.animate([
+        { transform: `translate(${rect.left}px, ${rect.top}px) rotate(0deg)`, opacity: 1 },
+        { transform: `translate(${rect.left + dir * 24}px, ${rect.top - 46}px) rotate(${dir * 24}deg) scale(.8)`, opacity: 0 },
+      ], { duration: 460, delay: i * 70, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'both' }).onfinish = () => node.remove();
+    });
+    rowEl.classList.add('flash');
+    setTimeout(() => rowEl.classList.remove('flash'), 800);
+  }
+
+  /** 서버가 확인해 준 내 수: 먼저 날아간 타일을 실제 자리에 내려앉힌다 */
+  function landOptimistic(rowEl, lp, opt, removed) {
+    if (lp.kind !== 'run') {
+      const ghosts = removed.map(({ html, rect }) => {
+        const node = makeFloating(html, rect.width);
+        node.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
+        return { node, rect };
       });
-      rowEl.classList.add('flash');
-      setTimeout(() => rowEl.classList.remove('flash'), 800);
-    };
+      const { node, anim, target } = opt.items[0];
+      afterAnim(anim, () => specialImpact(rowEl, node, target, ghosts));
+      return;
+    }
+    opt.items.forEach(({ tile }) => state.inFlight.add(tile.id));
+    $$('.row-tiles .tile', rowEl).forEach((el) => { if (state.inFlight.has(el.dataset.id)) el.classList.add('incoming'); });
+    opt.items.forEach(({ tile, node, anim, target }, i) => afterAnim(anim, () => {
+      const settle = () => {
+        node.remove();
+        state.inFlight.delete(tile.id);
+        const landed = $(`#rows .tile[data-id="${tile.id}"]`);
+        if (landed) {
+          landed.classList.remove('incoming');
+          landed.classList.add('landed');
+        }
+        if (i === opt.items.length - 1) {
+          rowEl.classList.add('flash');
+          setTimeout(() => rowEl.classList.remove('flash'), 800);
+        }
+      };
+      // 실제 자리가 미리 잰 자리와 다르면(줄이 줄여 표시되는 경우 등) 살짝 미끄러져 맞춘다
+      const real = $(`#rows .tile[data-id="${tile.id}"]`)?.getBoundingClientRect();
+      if (!real || (Math.abs(real.left - target.left) < 2 && Math.abs(real.top - target.top) < 2)) return settle();
+      node.animate([
+        { transform: `translate(${target.left}px, ${target.top}px) scale(1)` },
+        { transform: `translate(${real.left}px, ${real.top}px) scale(${real.width / target.width})` },
+      ], { duration: 160, easing: 'ease-out', fill: 'both' }).onfinish = settle;
+    }));
   }
 
   /** 쓰레기통: 줄 끝에서 몇 개를 제거할지 고른다 (1 타일 제외). */
