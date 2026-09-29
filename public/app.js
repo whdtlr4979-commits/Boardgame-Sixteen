@@ -25,7 +25,13 @@ import { createNet } from './net.js';
     chatOpen: false,
     tab: 'chat',
     shownRoundResult: null,
+    lastPlayKey: undefined, // 마지막으로 애니메이션한 수
+    pendingAnim: null,
+    flyFrom: null,          // 내가 낸 타일의 출발 위치 (손패에서)
+    sentIds: new Set(),     // 서버 응답을 기다리는 동안 손패에서 숨길 타일
+    inFlight: new Set(),    // 날아오는 중이라 테이블에서 아직 숨겨 둘 타일
   };
+  const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------------- 테마 ---------------- */
   function applyTheme(t) {
@@ -463,10 +469,20 @@ import { createNet } from './net.js';
       } else state.newIds = new Set();
       state.prevHandIds = ids;
       for (const id of [...state.selected]) if (!ids.has(id)) state.selected.delete(id);
+      for (const id of [...state.sentIds]) if (!ids.has(id)) state.sentIds.delete(id);
     } else {
       state.prevHandIds = null;
       state.selected.clear();
     }
+
+    // 새로 놓인 수가 있으면, 화면을 다시 그리기 전에 출발 위치를 기억해 둔다
+    const lp = g?.lastPlay;
+    const lpKey = lp ? `${lp.by}:${lp.row}:${lp.tiles.map((t) => t.id).join(',')}` : null;
+    state.pendingAnim = null;
+    if (lpKey && state.lastPlayKey !== undefined && lpKey !== state.lastPlayKey && prev?.game && state.view === 'game' && !REDUCED_MOTION) {
+      state.pendingAnim = prepareAnim(prev.game, g);
+    }
+    state.lastPlayKey = lpKey;
 
     $('#navGame').hidden = false;
     $('#tabGame').hidden = false;
@@ -579,7 +595,7 @@ import { createNet } from './net.js';
       const backs = Array.from({ length: Math.min(p.count, maxBacks) }, backHTML).join('')
         + (p.count > maxBacks ? `<span class="more">+${p.count - maxBacks}</span>` : '');
       return `
-        <div class="seat-card ${turn ? 'turn' : ''}">
+        <div class="seat-card ${turn ? 'turn' : ''}" data-pid="${esc(p.id)}">
           <span class="avatar ring ${p.isBot ? 'bot' : ''}">${esc(memberAvatar(p.id))}<span class="online-dot ${online ? '' : 'off'}"></span></span>
           <div class="meta"><strong>${esc(p.name)}</strong><span>타일 ${p.count}개${g.phase === 'finished' ? ` · ${p.score}점` : ''}</span>${turn ? `<span class="turn-tag">${p.isBot ? '생각 중…' : '차례'}</span>` : ''}</div>
           ${stalled ? `<button class="btn sm" data-replace="${esc(p.id)}" title="응답이 없는 플레이어를 봇으로 대체">🤖 봇으로 대체</button>` : `<div class="seat-backs">${backs}</div>`}
@@ -608,11 +624,17 @@ import { createNet } from './net.js';
       return `
         <div class="row ${row.closed || !row.tiles.length ? 'closed' : ''} ${justPlayed ? 'just' : ''}" data-row="${row.color}">
           <span class="row-label ${row.color}">${Sixteen.COLOR_NAMES[row.color]}</span>
-          <div class="row-tiles">${tiles.length ? tiles.map((t) => (t ? tileHTML(t, 'md') : '<span class="row-gap">…</span>')).join('') : '<span class="row-gap">이 색의 1 타일이 상자에 남아 놓을 수 없습니다</span>'}</div>
+          <div class="row-tiles">${tiles.length ? tiles.map((t) => (t ? tileHTML(t, `md ${state.inFlight.has(t.id) ? 'incoming' : ''}`) : '<span class="row-gap">…</span>')).join('') : '<span class="row-gap">이 색의 1 타일이 상자에 남아 놓을 수 없습니다</span>'}</div>
           <span class="row-top">${!row.tiles.length ? '1 없음' : row.closed ? '■ 닫힘' : `${row.top} 초과`}</span>
         </div>`;
     }).join('');
     $$('#rows .row').forEach((el) => (el.onclick = () => playOnRow(el.dataset.row)));
+    // 좁은 화면에서 줄이 넘치면 가장 최근(오른쪽 끝) 타일이 보이도록 스크롤
+    $$('#rows .row-tiles').forEach((el) => { el.scrollLeft = el.scrollWidth; });
+    if (state.pendingAnim) {
+      runAnim(state.pendingAnim);
+      state.pendingAnim = null;
+    }
 
     const cur = g.players[g.current];
     const hand = g.hand || [];
@@ -639,7 +661,7 @@ import { createNet } from './net.js';
     const handSum = hand.reduce((sum, t) => sum + Sixteen.tilePenalty(t), 0);
     $('#handInfo').textContent = mine ? `타일 ${mine.count}개 · 남은 숫자 합 ${handSum}` : '';
     $('#hand').innerHTML = hand.map((t) =>
-      tileHTML(t, `${state.selected.has(t.id) ? 'sel' : ''} ${state.newIds.has(t.id) ? 'new' : ''}`)).join('');
+      tileHTML(t, `${state.selected.has(t.id) ? 'sel' : ''} ${state.newIds.has(t.id) ? 'new' : ''} ${state.sentIds.has(t.id) ? 'sent' : ''}`)).join('');
     $$('#hand .tile').forEach((el) => (el.onclick = () => toggleTile(Number(el.dataset.id))));
     $('#passBtn').disabled = !myTurn || canMove;
     $('#passBtn').textContent = g.bonus ? '넘기기' : '패스';
@@ -701,8 +723,138 @@ import { createNet } from './net.js';
       return;
     }
     if (v.kind === 'trash' && count == null) return pickTrashCount(v.row, v.max);
+    // 애니메이션 출발 위치: 손패에 있던 타일 자리
+    const rects = {};
+    for (const t of tiles) {
+      const el = $(`#hand .tile[data-id="${t.id}"]`);
+      if (el) rects[t.id] = el.getBoundingClientRect();
+      if (el) el.classList.add('sent');
+      state.sentIds.add(t.id);
+    }
+    state.flyFrom = { t: Date.now(), rects };
     const res = await emit('play', { tileIds: tiles.map((t) => t.id), row: v.row, count });
     if (res.ok) state.selected.clear();
+    else {
+      for (const t of tiles) state.sentIds.delete(t.id);
+      state.flyFrom = null;
+      renderBoard();
+    }
+  }
+
+  /* ---------------- 타일 내려놓기 애니메이션 ---------------- */
+
+  /** 다시 그리기 전: 타일이 날아올 출발 위치와 (가위·쓰레기통이면) 사라질 타일 위치를 기억한다. */
+  function prepareAnim(prevG, g) {
+    const lp = g.lastPlay;
+    const player = g.players[lp.by];
+    let origins = null;
+    if (player && player.id === state.room.you && state.flyFrom && Date.now() - state.flyFrom.t < 10000) {
+      origins = lp.tiles.map((t) => state.flyFrom.rects[t.id] || null);
+    }
+    state.flyFrom = null;
+    if (!origins || origins.some((o) => !o)) {
+      // 다른 사람이 낸 수: 그 사람 자리(아바타)에서 날아온다
+      const seat = player && document.querySelector(`.seat-card[data-pid="${CSS.escape(player.id)}"] .avatar`);
+      const r = (seat || $('#handAvatar')).getBoundingClientRect();
+      origins = lp.tiles.map(() => ({ left: r.left + r.width / 2, top: r.top + r.height / 2, width: 0, height: 0 }));
+    }
+    let removed = [];
+    if (lp.kind !== 'run') {
+      const prevRow = prevG.rows.find((r) => r.color === lp.row);
+      const newRow = g.rows.find((r) => r.color === lp.row);
+      const n = prevRow && newRow ? prevRow.tiles.length - newRow.tiles.length : 0;
+      if (n > 0) {
+        removed = $$(`#rows .row[data-row="${lp.row}"] .row-tiles .tile`).slice(-n)
+          .map((el) => ({ html: el.outerHTML, rect: el.getBoundingClientRect() }));
+      }
+    }
+    return { lp, origins, removed };
+  }
+
+  function makeFloating(html, width) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    const node = wrap.firstElementChild;
+    node.classList.add('fly-tile');
+    node.classList.remove('sel', 'sent', 'new', 'landed', 'sm', 'md', 'lg');
+    node.style.setProperty('--w', `${width}px`);
+    document.body.append(node);
+    return node;
+  }
+
+  /** from(출발 사각형) → to(도착 사각형)로 포물선을 그리며 날아간다. */
+  function flyTile(tile, from, to, delay) {
+    const w = to.width;
+    const node = makeFloating(tileHTML(tile), w);
+    const fromW = from.width || w * 0.45;
+    const fx = from.width ? from.left : from.left - fromW / 2;
+    const fy = from.width ? from.top : from.top - (fromW * 1.04) / 2;
+    const s0 = fromW / w;
+    const peakY = Math.min(fy, to.top) - Math.max(30, Math.abs(fy - to.top) * 0.18);
+    const anim = node.animate([
+      { transform: `translate(${fx}px, ${fy}px) scale(${s0})`, opacity: from.width ? 1 : 0 },
+      { transform: `translate(${(fx + to.left) / 2}px, ${peakY}px) scale(${Math.max(s0, 1) * 1.12})`, opacity: 1, offset: 0.55 },
+      { transform: `translate(${to.left}px, ${to.top}px) scale(1)`, opacity: 1 },
+    ], { duration: 620, delay, easing: 'cubic-bezier(.3,.7,.25,1)', fill: 'both' });
+    return { node, anim };
+  }
+
+  function runAnim({ lp, origins, removed }) {
+    const rowEl = $(`#rows .row[data-row="${lp.row}"]`);
+    if (!rowEl) return;
+    const STAGGER = 110;
+
+    if (lp.kind === 'run') {
+      const targets = $$('.row-tiles .tile', rowEl).slice(-lp.tiles.length);
+      if (targets.length !== lp.tiles.length) return;
+      // 날아오는 동안 화면이 다시 그려져도 도착 타일이 먼저 보이지 않도록 id 로 숨겨 둔다
+      lp.tiles.forEach((t) => state.inFlight.add(t.id));
+      targets.forEach((el) => el.classList.add('incoming'));
+      lp.tiles.forEach((tile, i) => {
+        const { node, anim } = flyTile(tile, origins[i], targets[i].getBoundingClientRect(), i * STAGGER);
+        anim.onfinish = () => {
+          node.remove();
+          state.inFlight.delete(tile.id);
+          const landed = $(`#rows .tile[data-id="${tile.id}"]`);
+          if (landed) {
+            landed.classList.remove('incoming');
+            landed.classList.add('landed');
+          }
+          if (i === lp.tiles.length - 1) {
+            rowEl.classList.add('flash');
+            setTimeout(() => rowEl.classList.remove('flash'), 800);
+          }
+        };
+      });
+      return;
+    }
+
+    // 가위·쓰레기통: 도구가 줄 끝으로 날아가고, 제거되는 타일이 튕겨 나간다
+    const ghosts = removed.map(({ html, rect }) => {
+      const node = makeFloating(html, rect.width);
+      node.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
+      node.style.visibility = '';
+      return { node, rect };
+    });
+    const last = ghosts.length ? ghosts[ghosts.length - 1].rect : $('.row-tiles', rowEl).getBoundingClientRect();
+    const w = rowEl.querySelector('.row-tiles .tile')?.getBoundingClientRect().width || 40;
+    const target = { left: last.left + (ghosts.length ? 0 : 8), top: last.top - (ghosts.length ? w * 0.6 : 0), width: w, height: w * 1.04 };
+    const { node: tool, anim } = flyTile(lp.tiles[0], origins[0], target, 0);
+    anim.onfinish = () => {
+      tool.animate([
+        { transform: `translate(${target.left}px, ${target.top}px) scale(1)`, opacity: 1 },
+        { transform: `translate(${target.left - w * 0.2}px, ${target.top - w * 0.2}px) scale(1.4)`, opacity: 0 },
+      ], { duration: 380, easing: 'ease-out', fill: 'both' }).onfinish = () => tool.remove();
+      ghosts.reverse().forEach(({ node, rect }, i) => {
+        const dir = i % 2 ? 1 : -1;
+        node.animate([
+          { transform: `translate(${rect.left}px, ${rect.top}px) rotate(0deg)`, opacity: 1 },
+          { transform: `translate(${rect.left + dir * 24}px, ${rect.top - 46}px) rotate(${dir * 24}deg) scale(.8)`, opacity: 0 },
+        ], { duration: 460, delay: i * 70, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'both' }).onfinish = () => node.remove();
+      });
+      rowEl.classList.add('flash');
+      setTimeout(() => rowEl.classList.remove('flash'), 800);
+    };
   }
 
   /** 쓰레기통: 줄 끝에서 몇 개를 제거할지 고른다 (1 타일 제외). */
