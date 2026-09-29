@@ -336,6 +336,12 @@ import { createNet } from './net.js';
   }
 
   /* ---------------- 네비게이션 ---------------- */
+  /** 게임 중에는 사이드바·상단바·탭바를 숨기고 화면 전체를 게임판으로 쓴다. */
+  function setInGame(on) {
+    document.body.classList.toggle('in-game', on);
+    if (!on) closeChat();
+  }
+
   function go(view) {
     if (view === 'create') return showCreate();
     if (view === 'search') return showJoin();
@@ -347,6 +353,7 @@ import { createNet } from './net.js';
     $('#viewRoom').hidden = view !== 'game';
     $$('[data-nav]').forEach((b) => b.classList.toggle('active', b.dataset.nav === view));
     if (view === 'game') renderRoom();
+    else setInGame(false);
     window.scrollTo(0, 0);
   }
   $$('[data-nav]').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); go(b.dataset.nav); }));
@@ -494,6 +501,7 @@ import { createNet } from './net.js';
     const g = r.game;
     $('#waiting').hidden = !!g;
     $('#board').hidden = !g;
+    setInGame(!!g && state.view === 'game');
     if (!g) renderWaiting(); else renderBoard();
     renderChat();
   }
@@ -555,22 +563,33 @@ import { createNet } from './net.js';
     const myTurn = g.phase === 'playing' && g.current === me;
     $('#board').classList.toggle('not-turn', !myTurn);
 
-    // 상대 (스토리 스타일)
+    // 다른 플레이어를 테이블 둘레(북·서·동)에 앉힌다. 나는 남쪽, 차례는 시계 방향(서 → 북 → 동).
     const order = g.players.map((p, i) => ({ ...p, seat: i }));
-    const rotated = me >= 0 ? [...order.slice(me + 1), ...order.slice(0, me)] : order;
-    $('#opponents').innerHTML = rotated.map((p) => {
+    const others = me >= 0 ? [...order.slice(me + 1), ...order.slice(0, me)] : order;
+    const spots = { 1: ['north'], 2: ['west', 'east'], 3: ['west', 'north', 'east'] }[others.length] || [];
+    const bySpot = {};
+    others.forEach((p, i) => { if (spots[i]) bySpot[spots[i]] = p; });
+    const seatHTML = (p, spot) => {
+      if (!p) return '';
       const turn = g.phase === 'playing' && g.current === p.seat;
-      const backs = Array.from({ length: Math.min(p.count, 8) }, backHTML).join('');
       const member = r.memberList.find((m) => m.id === p.id);
       const online = !member || member.online;
       const stalled = turn && !p.isBot && g.lastMoveAt && Date.now() - g.lastMoveAt > STALL_MS;
+      const maxBacks = spot === 'north' ? 10 : 12;
+      const backs = Array.from({ length: Math.min(p.count, maxBacks) }, backHTML).join('')
+        + (p.count > maxBacks ? `<span class="more">+${p.count - maxBacks}</span>` : '');
       return `
-        <div class="opp ${turn ? 'turn' : ''}">
+        <div class="seat-card ${turn ? 'turn' : ''}">
           <span class="avatar ring ${p.isBot ? 'bot' : ''}">${esc(memberAvatar(p.id))}<span class="online-dot ${online ? '' : 'off'}"></span></span>
-          <div class="meta"><strong>${esc(p.name)}</strong><span>타일 ${p.count}개${g.phase === 'finished' ? ` · ${p.score}점` : ''}</span></div>
-          ${stalled ? `<button class="btn sm" data-replace="${esc(p.id)}" title="응답이 없는 플레이어를 봇으로 대체">🤖 봇으로 대체</button>` : `<div class="mini-backs">${backs}</div>`}
+          <div class="meta"><strong>${esc(p.name)}</strong><span>타일 ${p.count}개${g.phase === 'finished' ? ` · ${p.score}점` : ''}</span>${turn ? `<span class="turn-tag">${p.isBot ? '생각 중…' : '차례'}</span>` : ''}</div>
+          ${stalled ? `<button class="btn sm" data-replace="${esc(p.id)}" title="응답이 없는 플레이어를 봇으로 대체">🤖 봇으로 대체</button>` : `<div class="seat-backs">${backs}</div>`}
         </div>`;
-    }).join('');
+    };
+    $('#seatNorth').innerHTML = seatHTML(bySpot.north, 'north');
+    $('#seatWest').innerHTML = seatHTML(bySpot.west, 'west');
+    $('#seatEast').innerHTML = seatHTML(bySpot.east, 'east');
+    $('#board').classList.toggle('no-sides', !bySpot.west && !bySpot.east);
+    $('#board').classList.toggle('no-north', !bySpot.north);
     $$('[data-replace]').forEach((b) => (b.onclick = async () => {
       b.disabled = true;
       if ((await emit('replace', { id: b.dataset.replace })).ok) toast('봇이 대신 플레이합니다');
@@ -781,7 +800,8 @@ import { createNet } from './net.js';
     } else $('#scoreBody').innerHTML = '<div class="sys">아직 점수가 없습니다</div>';
 
     const userMsgs = r.chat.filter((m) => !m.system).length;
-    if (state.chatOpen || window.innerWidth > 1100) state.lastChatSeen = userMsgs;
+    const chatVisible = state.chatOpen || (window.innerWidth > 1100 && !document.body.classList.contains('in-game'));
+    if (chatVisible) state.lastChatSeen = userMsgs;
     const unread = userMsgs - state.lastChatSeen;
     $('#chatBadge').hidden = unread <= 0;
     $('#chatBadge').textContent = unread > 9 ? '9+' : unread;
