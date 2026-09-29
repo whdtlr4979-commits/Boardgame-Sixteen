@@ -267,27 +267,44 @@ select, .input {
 .input { width: 100%; padding: 10px 12px; }
 .input:focus, select:focus { outline: none; border-color: var(--muted); }
 
-.board { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
-.opponents { display: flex; gap: 12px; overflow-x: auto; padding: 6px 2px 2px; scrollbar-width: none; }
-.opponents::-webkit-scrollbar { display: none; }
-.opp {
-  display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border-radius: 999px;
-  background: var(--surface); border: 1px solid var(--border); flex: none; transition: box-shadow .2s, transform .2s;
+/* 게임판: 가운데 테이블 + 북·서·동 플레이어 + 남쪽 내 손패 */
+.board {
+  flex: 1; min-height: 0;
+  display: grid; gap: 12px;
+  grid-template-columns: minmax(110px, 170px) minmax(0, 1fr) minmax(110px, 170px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: ". north ." "west table east" "hand hand hand";
 }
-.opp .avatar { --size: 40px; }
-.opp .online-dot { width: 11px; height: 11px; bottom: 0; right: 0; }
-.opp .avatar.ring::before { background: var(--border); }
-.opp.turn { box-shadow: 0 0 0 2px #d62976 inset, var(--shadow); transform: translateY(-2px); }
-.opp.turn .avatar.ring::before { background: var(--ig); animation: spin 2.4s linear infinite; }
-.opp .meta { display: flex; flex-direction: column; line-height: 1.25; }
-.opp .meta strong { font-size: 13px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.opp .meta span { font-size: 12px; color: var(--muted); }
-.opp .mini-backs { display: flex; margin-left: 4px; }
-.opp .mini-backs .tile { --w: 13px; margin-left: -4px; }
-.opp .mini-backs .tile img { filter: none; }
-.opp.passed { opacity: .65; }
-.opp .passed-tag { font-size: 11px; font-weight: 700; color: var(--muted); }
-@keyframes spin { to { transform: rotate(360deg); } }
+.board.no-sides { grid-template-columns: 0 minmax(0, 1fr) 0; column-gap: 0; }
+.board.no-north { grid-template-rows: 0 minmax(0, 1fr) auto; row-gap: 0; }
+.seat-north { grid-area: north; justify-self: center; }
+.seat-west { grid-area: west; align-self: center; justify-self: stretch; }
+.seat-east { grid-area: east; align-self: center; justify-self: stretch; }
+.seat:empty { display: none; }
+.board > .table { grid-area: table; }
+.board > .hand-area { grid-area: hand; }
+
+.seat-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center;
+  padding: 14px 10px 12px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border);
+  transition: box-shadow .2s, transform .2s; position: relative;
+}
+.seat-north .seat-card { flex-direction: row; text-align: left; padding: 8px 16px 8px 8px; border-radius: 999px; gap: 10px; }
+.seat-card .avatar { --size: 52px; }
+.seat-north .seat-card .avatar { --size: 40px; }
+.seat-card .avatar.ring::before { background: var(--border); }
+.seat-card .online-dot { width: 12px; height: 12px; bottom: 0; right: 0; }
+.seat-card.turn { box-shadow: 0 0 0 2px #d62976 inset, var(--shadow); transform: scale(1.03); }
+.seat-card.turn .avatar.ring::before { background: var(--ig); animation: spin 2.4s linear infinite; }
+.seat-card .meta { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; max-width: 100%; }
+.seat-card .meta strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat-card .meta span { font-size: 12px; color: var(--muted); }
+.seat-card .turn-tag { font-size: 11px; font-weight: 800; color: #d62976; }
+.seat-backs { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; max-width: 120px; }
+.seat-north .seat-backs { flex-wrap: nowrap; max-width: none; }
+.seat-backs .tile { --w: 14px; }
+.seat-backs .tile img { filter: none; }
+.seat-backs .more { font-size: 11px; font-weight: 700; color: var(--muted); align-self: center; margin-left: 2px; }
 
 .table { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .table-top { display: flex; gap: 8px; padding: 10px 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border-soft); align-items: center; }
@@ -476,8 +493,32 @@ select, .input {
   .row-tiles .tile { --w: 28px; }
   .row-top { min-width: 40px; font-size: 11px; }
   .table-felt { padding: 12px; }
-  .opp { padding: 6px 10px 6px 6px; }
-  .opp .avatar { --size: 32px; }
-  .opp .mini-backs { display: none; }
   .modal-body { padding: 16px 18px 20px; }
+}
+
+/* ---------- 게임 중: 사이드바·상단바·탭바를 숨기고 화면 전체를 게임판으로 ---------- */
+body.in-game .sidebar, body.in-game .topbar, body.in-game .tabbar { display: none !important; }
+body.in-game main { margin-left: 0; padding: 0; min-height: 100vh; }
+body.in-game .view-room { max-width: none; height: 100vh; height: 100dvh; padding: 10px 12px; gap: 0; }
+body.in-game .room-main { gap: 10px; }
+body.in-game .room-header { padding: 6px 10px; }
+body.in-game .chat {
+  position: fixed; right: 0; top: 0; bottom: 0; width: min(380px, 100%); z-index: 60; border-radius: 0;
+  transform: translateX(100%); transition: transform .25s; box-shadow: var(--shadow);
+}
+body.in-game .chat.open { transform: none; }
+body.in-game .chat-close { display: inline-flex; }
+body.in-game .chat-fab { display: inline-flex; position: relative; }
+body.in-game .chat-fab .badge { position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); }
+body.in-game .toasts { bottom: 24px; }
+@media (max-width: 767px) {
+  body.in-game .view-room { height: auto; min-height: 100dvh; padding: 8px; }
+  body.in-game .board { grid-template-columns: 74px minmax(0, 1fr) 74px; gap: 8px; }
+  body.in-game .board.no-sides { grid-template-columns: 0 minmax(0, 1fr) 0; }
+  body.in-game .seat-card { padding: 8px 4px; gap: 4px; border-radius: 14px; }
+  body.in-game .seat-card .avatar { --size: 38px; }
+  body.in-game .seat-card .meta strong { font-size: 12px; max-width: 66px; }
+  body.in-game .seat-backs { display: none; }
+  body.in-game .seat-north .seat-card { padding: 6px 12px 6px 6px; }
+  body.in-game .seat-north .seat-card .avatar { --size: 32px; }
 }
