@@ -47,7 +47,11 @@ function profileOf(p) {
 export function createCore(db, opts = {}) {
   const now = opts.now || (() => Date.now());
   const sleep = opts.sleep || ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const botDelay = opts.botDelay ?? 900;
+  // 봇이 한 수를 두기 전에 기다리는 시간(ms): 숫자 하나 또는 [최소, 최대] 범위
+  const botDelay = opts.botDelay ?? [3000, 5000];
+  const botWait = () => (Array.isArray(botDelay)
+    ? botDelay[0] + Math.random() * (botDelay[1] - botDelay[0])
+    : botDelay);
 
   /* ---------------- 공통 헬퍼 ---------------- */
 
@@ -405,7 +409,7 @@ export function createCore(db, opts = {}) {
       if (!row) return;
       const game = SixteenGame.fromJSON(row.state);
       if (game.phase !== 'playing' || !game.players[game.current].isBot) return;
-      await sleep(botDelay);
+      await sleep(botWait());
       const fresh = await db.loadGame(code);
       if (!fresh || fresh.version !== row.version) continue;
       const room = await db.getRoom(code);

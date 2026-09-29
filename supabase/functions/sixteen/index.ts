@@ -5,7 +5,9 @@ import { ConflictError, UserError, createCore } from '../_shared/core.js';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const BOT_DELAY_MS = Number(Deno.env.get('BOT_DELAY_MS') ?? 900);
+// 봇이 한 수를 두기 전 기다리는 시간(ms). '3000-5000' 처럼 범위를 주면 그 사이에서 무작위로 고른다.
+const BOT_DELAY = (Deno.env.get('BOT_DELAY_MS') ?? '3000-5000').split('-').map(Number);
+const BOT_DELAY_MS = BOT_DELAY.length > 1 ? [BOT_DELAY[0], BOT_DELAY[1]] : BOT_DELAY[0];
 
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
