@@ -31,7 +31,6 @@ import { createNet } from './net.js';
     sentIds: new Set(),     // 서버 응답을 기다리는 동안 손패에서 숨길 타일
     inFlight: new Set(),    // 날아오는 중이라 테이블에서 아직 숨겨 둘 타일
   };
-  const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------------- 테마 ---------------- */
   function applyTheme(t) {
@@ -479,7 +478,7 @@ import { createNet } from './net.js';
     const lp = g?.lastPlay;
     const lpKey = lp ? `${lp.by}:${lp.row}:${lp.tiles.map((t) => t.id).join(',')}` : null;
     state.pendingAnim = null;
-    if (lpKey && state.lastPlayKey !== undefined && lpKey !== state.lastPlayKey && prev?.game && state.view === 'game' && !REDUCED_MOTION) {
+    if (lpKey && state.lastPlayKey !== undefined && lpKey !== state.lastPlayKey && prev?.game && state.view === 'game') {
       state.pendingAnim = prepareAnim(prev.game, g);
     }
     state.lastPlayKey = lpKey;
