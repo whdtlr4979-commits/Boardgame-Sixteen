@@ -18,9 +18,34 @@ function signInHint(error) {
   return 'Supabase 설정과 config.js 값을 확인하세요';
 }
 
+// 'https://xxx.supabase.co/rest/v1/' 처럼 API 경로까지 붙여 넣어도 동작하도록 기본 주소만 남긴다.
+const baseUrl = (config) => String(config.supabaseUrl).trim().replace(/\/(rest|auth|functions|realtime)\/v1\/?.*$/, '').replace(/\/+$/, '');
+
+/**
+ * Supabase 서버가 응답하는지 확인한다.
+ * 무료 프로젝트는 오래 쓰지 않으면 일시정지되는데, 그러면 이 요청이 실패한다.
+ * @returns {Promise<'ok' | 'offline' | 'down'>}
+ */
+export async function checkServer(config, timeoutMs = 8000) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${baseUrl(config)}/auth/v1/health`, {
+      headers: { apikey: String(config.supabaseAnonKey).trim() },
+      signal: ctrl.signal,
+      cache: 'no-store',
+    });
+    return res.ok ? 'ok' : 'down';
+  } catch {
+    return typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'down';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function createNet(config, handlers) {
-  // 'https://xxx.supabase.co/rest/v1/' 처럼 API 경로까지 붙여 넣어도 동작하도록 기본 주소만 남긴다.
-  const url = String(config.supabaseUrl).trim().replace(/\/(rest|auth|functions|realtime)\/v1\/?.*$/, '').replace(/\/+$/, '');
+  const url = baseUrl(config);
   const sb = supabase.createClient(url, String(config.supabaseAnonKey).trim(), {
     auth: { persistSession: true, autoRefreshToken: true, storageKey: 'sixteen.auth' },
   });
@@ -58,7 +83,8 @@ export function createNet(config, handlers) {
         const body = await error.context.json();
         if (body?.error) message = body.error;
       } catch { /* 본문 없음 */ }
-      return { ok: false, error: message };
+      // 응답 자체를 못 받았으면(서버 일시정지·네트워크 끊김) 화면에서 서버 상태를 확인한다
+      return { ok: false, error: message, unreachable: error.name !== 'FunctionsHttpError' };
     }
     if (data?.ok) {
       if (['create', 'join', 'resume'].includes(action)) {

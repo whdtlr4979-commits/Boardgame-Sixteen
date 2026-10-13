@@ -559,3 +559,23 @@ body.in-game .toasts { bottom: 24px; }
 .tile.landed { animation: land .32s cubic-bezier(.2,.8,.3,1.3); }
 @keyframes land { 0% { transform: scale(1.18); } 55% { transform: scale(.94); } 100% { transform: scale(1); } }
 .hand .tile.sent { opacity: 0; transform: translateY(-18px) scale(.9); pointer-events: none; }
+
+/* ---------------- 서버 일시정지 안내 (화면 전체) ---------------- */
+.server-down {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px;
+  background: var(--ig); overflow-y: auto;
+}
+.server-down[hidden] { display: none; }
+body.server-is-down { overflow: hidden; }
+.server-down-card {
+  width: min(560px, 100%); background: var(--surface); color: var(--text); border-radius: 28px;
+  padding: 40px 32px 28px; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.25);
+}
+.server-down-icon { font-size: 84px; line-height: 1; animation: snooze 2.4s ease-in-out infinite; }
+.server-down h1 { font-size: clamp(24px, 6vw, 34px); margin: 18px 0 12px; font-weight: 900; }
+.server-down p { margin: 0 0 12px; line-height: 1.6; color: var(--muted); }
+.server-down p.lead { color: var(--text); font-size: 17px; font-weight: 600; }
+.server-down a { color: #d62976; font-weight: 700; }
+.server-down .btn { margin: 10px 0 14px; padding: 12px 36px; font-size: 16px; }
+.server-down .small { font-size: 12px; margin: 0; }
+@keyframes snooze { 50% { transform: translateY(-8px) rotate(-6deg); } }
