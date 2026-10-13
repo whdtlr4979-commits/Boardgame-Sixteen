@@ -1,5 +1,5 @@
 import * as Sixteen from './game.js';
-import { createNet } from './net.js';
+import { createNet, checkServer } from './net.js';
 
 {
 
@@ -96,6 +96,7 @@ import { createNet } from './net.js';
     } catch (e) {
       res = { ok: false, error: e.message };
     }
+    if (!res.ok && res.unreachable && await watchServer()) return res;
     if (!res.ok) toast(res.error || '요청에 실패했습니다.', true);
     return res;
   }
@@ -109,8 +110,39 @@ import { createNet } from './net.js';
     if (state.view === 'game') go('home');
   }
 
+  /* ---------------- 서버 상태 (Supabase 일시정지 안내) ---------------- */
+  let serverTimer = null;
+  /** 서버가 응답하지 않으면 화면 전체에 안내를 띄우고 true 를 돌려준다. 다시 살아나면 페이지를 새로 연다. */
+  async function watchServer() {
+    const status = await checkServer(config);
+    const el = $('#serverDown');
+    if (status === 'ok') {
+      if (!el.hidden) location.reload();
+      return false;
+    }
+    $('#serverDownTitle').textContent = status === 'offline' ? '인터넷 연결이 끊겼어요' : '게임 서버가 잠들어 있어요';
+    $('#serverDownMsg').hidden = status === 'offline';
+    $('#serverOfflineMsg').hidden = status !== 'offline';
+    $('#serverDownTime').textContent = new Date().toLocaleTimeString('ko-KR');
+    el.hidden = false;
+    document.body.classList.add('server-is-down');
+    clearTimeout(serverTimer);
+    serverTimer = setTimeout(watchServer, 30000);
+    return true;
+  }
+  $('#serverRetry').onclick = async () => {
+    const b = $('#serverRetry');
+    b.disabled = true;
+    b.textContent = '확인 중…';
+    await watchServer();
+    b.disabled = false;
+    b.textContent = '다시 확인';
+  };
+  window.addEventListener('online', () => { if (!$('#serverDown').hidden) watchServer(); });
+
   async function boot() {
     if (!configured) return showSetup();
+    if (await watchServer()) return;
     net = createNet(config, {
       onLobby: (data) => { state.lobby = data; renderLobby(); },
       onRoom: (room) => onRoom(room),
@@ -133,6 +165,7 @@ import { createNet } from './net.js';
       if (!net.userId) await net.start(state.me);
       else await net.setProfile(state.me);
     } catch (e) {
+      if (await watchServer()) return false;
       toast(e.message, true);
       return false;
     }
